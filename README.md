@@ -1,2 +1,2 @@
 # hietcd
-Etcd client library
+Hietcd is a C client library for the Etcd.
