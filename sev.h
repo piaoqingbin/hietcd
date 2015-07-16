@@ -33,9 +33,9 @@
 #define SEV_OK 0
 #define SEV_ERR -1
 
-#define SEV_N 0 /* Null event */
-#define SEV_R 1 /* Readable event */
-#define SEV_W 2 /* Writable event */
+#define SEV_N 0 /* Null event flag */
+#define SEV_R 1 /* Readable event flag */
+#define SEV_W 2 /* Writable event flag */
 
 /* Macros */
 #define sev_stop(p) ((p)->done = 1)
