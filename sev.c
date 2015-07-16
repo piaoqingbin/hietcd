@@ -49,7 +49,7 @@ sev_pool *sev_pool_create(int size)
     pool->size = size;
     pool->done = 0;
     pool->maxfd = -1; 
-    pool->iproc = NULL;
+    pool->cron = NULL;
     if (sev_impl_create(pool) != SEV_OK)
         goto create_err;
     memset((void *)pool->events, 0, sizeof(sev_file_event) * size);
@@ -57,6 +57,8 @@ sev_pool *sev_pool_create(int size)
 
 create_err:
     if (pool) {
+        if (pool->events) free(pool->events);
+        if (pool->ready) free(pool->ready);
         free(pool); 
     }
     return NULL;
@@ -67,7 +69,6 @@ void sev_pool_destroy(sev_pool *pool)
     if (pool->events) free(pool->events);
     if (pool->ready) free(pool->ready);
     if (pool->impl) sev_impl_destroy(pool);
-    if (pool->iproc) free(pool->iproc);
     free(pool);
 }
 
@@ -76,7 +77,7 @@ int sev_add_event(sev_pool *pool, int fd, int flgs, sev_file_proc *proc,
 {
     sev_file_event *event = &pool->events[fd];
     if (fd > pool->size) return SEV_ERR;
-    if (sev_impl_add(pool, fd, flgs) != SEV_ERR) return SEV_ERR;
+    if (sev_impl_add(pool, fd, flgs) != SEV_OK) return SEV_ERR;
     event->flgs |= flgs;
     if (event->flgs & SEV_R) event->read = proc;
     if (event->flgs & SEV_W) event->write = proc; 
@@ -100,20 +101,6 @@ void sev_del_event(sev_pool *pool, int fd, int flgs)
     }
 }
 
-void sev_start(sev_pool *pool)
-{
-    pool->done = 0;
-    while (!pool->done) {
-        if (pool->iproc) pool->iproc(pool);
-        sev_process(pool);
-    }
-}
-
-void sev_stop(sev_pool *pool)
-{
-    pool->done = 1;
-}
-
 int sev_process(sev_pool *pool)
 {
     int i, num = 0;
@@ -134,4 +121,13 @@ int sev_process(sev_pool *pool)
         }
     } 
     return num;
+}
+
+void sev_dispatch(sev_pool *pool)
+{
+    pool->done = 0;
+    while (!pool->done) {
+        if (pool->cron) pool->cron(pool);
+        sev_process(pool);
+    }
 }

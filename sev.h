@@ -33,19 +33,26 @@
 #define SEV_OK 0
 #define SEV_ERR -1
 
-#define SEV_N 0
-#define SEV_R 1
-#define SEV_W 2
+#define SEV_N 0 /* Null event */
+#define SEV_R 1 /* Readable event */
+#define SEV_W 2 /* Writable event */
 
+/* Macros */
+#define sev_stop(p) ((p)->done = 1)
+#define sev_set_cron(p,i) ((p)->cron = (i))
+
+/* Event pool */
 struct sev_pool;
 
+/* Event handlers */
 typedef void sev_file_proc(struct sev_pool *pool, int fd, void *data, int flgs);
-typedef void sev_interval_proc(struct sev_pool *pool);
+typedef void sev_cron_proc(struct sev_pool *pool);
 
+/* File event */
 typedef struct {
-    int flgs;
-    sev_file_proc *read;
-    sev_file_proc *write;
+    int flgs; /* (Readable/Writable) flags */
+    sev_file_proc *read; /* Readable event handler */
+    sev_file_proc *write; /* Writable event handler */
     void *data;
 } sev_file_event;
 
@@ -54,22 +61,22 @@ typedef struct {
     int flgs;
 } sev_ready_event;
 
+/* Event pool structure */
 typedef struct sev_pool {
     int done;
     int size;
     int maxfd;
-    void *impl;
+    void *impl; /* Polling implementation */
     sev_file_event *events;
     sev_ready_event *ready;
-    sev_interval_proc *iproc; 
+    sev_cron_proc *cron; 
 } sev_pool;
 
 sev_pool *sev_pool_create(int size);
 void sev_pool_destroy(sev_pool *pool);
 int sev_add_event(sev_pool *pool, int fd, int flgs, sev_file_proc *proc, void *data);
 void sev_del_event(sev_pool *pool, int fd, int flgs);
-void sev_start(sev_pool *pool);
-void sev_stop(sev_pool *pool);
 int sev_process(sev_pool *pool);
+void sev_dispatch(sev_pool *pool);
 
 #endif

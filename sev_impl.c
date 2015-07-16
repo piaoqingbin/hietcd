@@ -79,7 +79,7 @@ static int sev_impl_poll(sev_pool *pool, struct timeval *tvp)
     memcpy(&impl->_wset, &impl->wset, sizeof(fd_set));
 
     if (select(pool->maxfd+1, &impl->_rset, &impl->_wset, NULL, tvp) > 0) {
-        for (fd = 0; fd < pool->maxfd; fd++, num++) {
+        for (fd = 0; fd <= pool->maxfd; fd++, num++) {
             int flgs = 0;
             sev_file_event *event = &pool->events[fd];  
 
