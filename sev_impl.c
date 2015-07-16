@@ -38,7 +38,6 @@ typedef struct {
     struct epoll_event *ee;
 } sev_impl;
 
-
 static int sev_impl_create(sev_pool *pool)
 {
     sev_impl *impl;
@@ -57,7 +56,7 @@ static int sev_impl_create(sev_pool *pool)
 
 impl_create_err:
     if (impl) {
-        if (impl->events) free(impl->events);
+        if (impl->ee) free(impl->ee);
         free(impl); 
     }
     return SEV_ERR;
