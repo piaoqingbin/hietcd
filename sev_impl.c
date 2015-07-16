@@ -29,6 +29,120 @@
  */
 #ifdef HAVE_EPOLL
 
+#include <sys/epoll.h>
+
+#define SEV_IMPL_NAME "epoll"
+
+typedef struct {
+    int epfd;
+    struct epoll_event *ee;
+} sev_impl;
+
+
+static int sev_impl_create(sev_pool *pool)
+{
+    sev_impl *impl;
+    
+    if (!(impl = malloc(sizeof(sev_impl))))
+        goto impl_create_err;
+
+    if (!(impl->ee = malloc(sizeof(struct epoll_event)*pool->size)))
+        goto impl_create_err;
+
+    if ((impl->epfd = epoll_create(1024)) == -1)
+        goto impl_create_err;
+
+    pool->impl = impl;
+    return SEV_OK;
+
+impl_create_err:
+    if (impl) {
+        if (impl->events) free(impl->events);
+        free(impl); 
+    }
+    return SEV_ERR;
+}
+
+static void sev_impl_destroy(sev_pool *pool)
+{
+    close(pool->impl->epfd);
+    free(pool->impl->ee);
+    free(pool->impl); 
+}
+
+static int sev_impl_add(sev_pool *pool, int fd, int flgs)
+{
+    sev_impl *impl = pool->impl;
+    struct epoll_event ee;
+    int op;
+    
+    ee.events = 0;
+    if (flgs & SEV_R) ee.events |= EPOLLIN;
+    if (flgs & SEV_W) ee.events |= EPOLLOUT;
+    ee.data.u64 = 0;
+    ee.data.fd = fd;
+
+    if (pool->events[fd].flgs == SEV_N)
+        op = EPOLL_CTL_ADD; 
+    else
+        op = EPOLL_CTL_MOD; 
+
+    if (epoll_ctl(impl->epfd, op, fd, &ee) == -1)  
+        return SEV_ERR;
+
+    return SEV_OK;
+}
+
+static void sev_impl_del(sev_pool *pool, int fd, int flgs)
+{
+    sev_impl *impl = pool->impl;
+    struct epoll_event ee;
+    int op;
+    
+    ee.events = 0;
+    if (flgs & SEV_R) ee.events |= EPOLLIN;
+    if (flgs & SEV_W) ee.events |= EPOLLOUT;
+    ee.data.u64 = 0;
+    ee.data.fd = fd;
+
+    if (pool->events[fd].flgs & (~flgs) == SEV_N)
+        op = EPOLL_CTL_DEL;
+    else
+        op = EPOLL_CTL_MOD;
+
+    epoll_ctl(impl->epfd, EPOLL_CTL_MOD, fd, &ee);
+}
+
+static int sev_impl_poll(sev_pool *pool, struct timeval *tvp)
+{
+    sev_impl *impl = pool->impl;
+    int i, num = 0, timeout = -1;
+
+    if (tvp) timeout = (tvp->tv_sec*1000) + (tvp->tv_usec/1000);
+
+    num = epoll_wait(impl->epfd, impl->ee, pool->size, timeout);
+    if (num > 0) {
+        int flgs;
+        struct epoll_event *ee;
+
+        for (i = 0; i < num; i++) {
+            flgs = 0;
+            ee = impl->ee[i];
+
+            if (ee->events & EPOLLIN) 
+                flgs |= SEV_R;
+
+            if (ee->events & EPOLLOUT || ee->events & EPOLLERR || 
+                    ee->events & EPOLLHUP)
+                flgs |= SEV_W;
+
+            pool->ready[i].fd = ee->data.fd;
+            pool->ready[i].flgs = flgs;
+        }
+    }
+
+    return num;
+}
 
 #else
 
@@ -50,7 +164,7 @@ static int sev_impl_create(sev_pool *pool)
     return SEV_OK;
 }
 
-static void sev_impl_free(sev_pool *pool)
+static void sev_impl_destroy(sev_pool *pool)
 {
     free(pool->impl);
 }
@@ -93,11 +207,6 @@ static int sev_impl_poll(sev_pool *pool, struct timeval *tvp)
         }
     }
     return num;
-}
-
-static void sev_impl_destroy(sev_pool *pool)
-{
-    free(pool->impl);
 }
 
 #endif
