@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <curl/curl.h>
+
 #include "hietcd.h"
 
 static void inline etcd_response_init(etcd_response *resp);
@@ -92,8 +94,10 @@ void etcd_response_cleanup(etcd_response *resp)
 {
     if (resp->node) 
         etcd_node_destroy(resp->node);
+
     if (resp->pnode)
         etcd_node_destroy(resp->pnode);
+
     etcd_response_init(resp);
 }
 
@@ -102,3 +106,46 @@ void etcd_response_destroy(etcd_response *resp)
     etcd_response_cleanup(resp);
     free(resp);
 }
+
+/*
+etcd_client *etcd_client_create(void)
+{
+    etcd_client *client = malloc(sizeof(etcd_client));    
+    client->cacert[0] = '\0';
+    client->timeout = HIETCD_DEFAULT_TIMEOUT;
+    client->conntimeout = HIETCD_DEFAULT_TIMEOUT;
+    client->keepalive = HIETCD_DEFAULT_KEEPALIVE;
+    client->snum = 0;
+    return client;
+}
+
+void etcd_client_destroy(etcd_client *client)
+{
+    while (--client->snum >= 0)
+        free(client->servers[client->snum]);
+    free(client); 
+}
+
+int etcd_add_server(etcd_client *client, const char *server, size_t len)
+{
+    if (client->snum >= HIETCD_MAX_NODE_NUM)
+        return HIETCD_ERR;
+
+    client->servers[client->snum++] = strndup(server, len); 
+    return HIETCD_OK;
+}
+
+int etcd_mkdir(etcd_client *client, const char *key, size_t len, int ttl, 
+    etcd_response *resp)
+{
+    
+}
+
+int etcd_send_request(etcd_client *client, const char *method, const char *key,
+    const char *query, const char *post, etcd_response *resp)
+{
+    CURL *ch;
+
+    ch = curl_easy_init();
+}
+*/

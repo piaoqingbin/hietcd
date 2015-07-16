@@ -31,12 +31,16 @@
 #ifndef _HIETCD_H_
 #define _HIETCD_H_
 
+#include <curl/curl.h>
+
 #define HIETCD_OK 0
 #define HIETCD_ERR -1
 
 #define HIETCD_ERR_CURL -2 /* CURL error */
 #define HIETCD_ERR_PROTOCOL -3 /* Protocol error */
 #define HIETCD_ERR_RESPONSE -4 /* Etcd response error */
+
+#define HIETCD_MAX_NODE_NUM 11
 
 #define HIETCD_DEFAULT_TIMEOUT 30
 #define HIETCD_DEFAULT_CONNTIMEOUT 1
@@ -90,12 +94,12 @@ typedef struct {
 } etcd_response;
 
 typedef struct {
-    char *cacert;
+    char cacert[256];
     short timeout;
     short conntimeout;
     short keepalive;
-    short num; /* number of servers */
-    char *servers[11];
+    short snum; /* number of servers */
+    char *servers[HIETCD_MAX_NODE_NUM];
 } etcd_client;
 
 etcd_node *etcd_node_create(void);
@@ -106,14 +110,14 @@ void etcd_response_cleanup(etcd_response *resp);
 void etcd_response_destroy(etcd_response *resp);
 
 /*
+etcd_client *etcd_client_create(void);
+void etcd_client_destroy(etcd_client *client);
+int etcd_add_server(etcd_client *client, const char *server, size_t len);
 
-void etcd_response_init(etcd_response *resp);
-void etcd_response_print(etcd_response *resp);
-void etcd_response_cleanup(etcd_response *resp);
+int etcd_mkdir(etcd_client *client, const char *key, size_t len, int ttl, etcd_response *resp);
 
-etcd_client *etcd_init(void);
-int32_t etcd_add_server(etcd_client *client, const char *server, uint64_t len);
-void etcd_destroy(etcd_client *client);
+int etcd_send_request(etcd_client *client, const char *method, const char *key,
+    const char *query, const char *post, etcd_response *resp);
 
 int32_t etcd_mkdir(etcd_client *client, const char *key, uint64_t ttl, etcd_response *resp);
 int32_t etcd_set(etcd_client *client, const char *key, const char *value, uint64_t ttl, etcd_response *resp);
