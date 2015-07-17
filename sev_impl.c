@@ -64,9 +64,11 @@ impl_create_err:
 
 static void sev_impl_destroy(sev_pool *pool)
 {
-    close(pool->impl->epfd);
-    free(pool->impl->ee);
-    free(pool->impl); 
+    sev_impl *impl = pool->impl;
+
+    if (impl->epfd > 0) close(impl->epfd);
+    free(impl->ee);
+    free(impl);
 }
 
 static int sev_impl_add(sev_pool *pool, int fd, int flgs)
@@ -126,7 +128,7 @@ static int sev_impl_poll(sev_pool *pool, struct timeval *tvp)
 
         for (i = 0; i < num; i++) {
             flgs = 0;
-            ee = impl->ee[i];
+            ee = &impl->ee[i];
 
             if (ee->events & EPOLLIN) 
                 flgs |= SEV_R;
