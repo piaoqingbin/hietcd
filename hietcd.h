@@ -33,6 +33,8 @@
 
 #include <curl/curl.h>
 
+#include "hio.h"
+
 #define HIETCD_OK 0
 #define HIETCD_ERR -1
 
@@ -63,6 +65,7 @@
 #define HIETCD_ACTION_UPDATE "update"
 #define HIETCD_ACTION_DELETE "delete"
 
+/* Etcd node structure */
 typedef struct etcd_node {
     char *key;
     char *value;
@@ -76,6 +79,7 @@ typedef struct etcd_node {
     unsigned long long ccount; /* number of childs */
 } etcd_node;
 
+/* Etcd http response structure */
 typedef struct {
     CURLcode ccode; /* CURLcode */
     int hcode; /* http status code */
@@ -93,13 +97,23 @@ typedef struct {
     etcd_node *pnode; /* prev node */
 } etcd_response;
 
-typedef struct {
+struct etcd_client;
+
+/*
+typedef void etcd_response_proc(etcd_client *client, 
+    etcd_response *resp, void *data);
+*/
+
+/* Etcd client structure */
+typedef struct etcd_client {
     char cacert[256];
     short timeout;
     short conntimeout;
     short keepalive;
     short snum; /* number of servers */
     char *servers[HIETCD_MAX_NODE_NUM];
+    int wfd; /* Writable pipe fd */
+    etcd_hio *io; /* http io thread */
 } etcd_client;
 
 etcd_node *etcd_node_create(void);
@@ -108,6 +122,13 @@ void etcd_node_destroy(etcd_node *node);
 etcd_response *etcd_response_create(void);
 void etcd_response_cleanup(etcd_response *resp);
 void etcd_response_destroy(etcd_response *resp);
+
+etcd_client *etcd_client_create(void);
+void etcd_client_destroy(etcd_client *client);
+
+/* Async api */
+void etcd_async_startup(etcd_client *client);
+int etcd_amkdir(etcd_client *client, const char *key, long long ttl);
 
 /*
 etcd_client *etcd_client_create(void);

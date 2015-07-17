@@ -29,6 +29,8 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#include<unistd.h>
+#include <pthread.h>
 
 #include <curl/curl.h>
 
@@ -107,7 +109,6 @@ void etcd_response_destroy(etcd_response *resp)
     free(resp);
 }
 
-/*
 etcd_client *etcd_client_create(void)
 {
     etcd_client *client = malloc(sizeof(etcd_client));    
@@ -115,6 +116,7 @@ etcd_client *etcd_client_create(void)
     client->timeout = HIETCD_DEFAULT_TIMEOUT;
     client->conntimeout = HIETCD_DEFAULT_TIMEOUT;
     client->keepalive = HIETCD_DEFAULT_KEEPALIVE;
+    client->io = NULL;
     client->snum = 0;
     return client;
 }
@@ -126,6 +128,42 @@ void etcd_client_destroy(etcd_client *client)
     free(client); 
 }
 
+void etcd_async_startup(etcd_client *client)
+{
+    if (client->io == NULL) {
+        int fds[2] = {0};
+
+        // create hio
+        etcd_hio *io = etcd_hio_create();
+        client->io = io;
+
+        // mkpipe
+        io->rfd = fds[0];
+        client->wfd = fds[1];
+
+        if (pipe(fds) == -1) {
+            // TODO 
+            return;
+        }
+
+        io->elt.tv_sec = 1;
+        io->elt.tv_usec = 0;
+
+        io->size = 1024;
+        io->cmh = curl_multi_init();
+
+        pthread_create(&io->tid, NULL, etcd_hio_startup, (void *)io); 
+    }
+}
+
+int etcd_amkdir(etcd_client *client, const char *key, long long ttl)
+{
+    const char buf[32] = "etcd_amkdir\n";
+    write(client->wfd, buf, sizeof(buf));
+    return HIETCD_OK;
+}
+
+/*
 int etcd_add_server(etcd_client *client, const char *server, size_t len)
 {
     if (client->snum >= HIETCD_MAX_NODE_NUM)
