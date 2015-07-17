@@ -77,10 +77,12 @@ int sev_add_event(sev_pool *pool, int fd, int flgs, sev_file_proc *proc,
     sev_file_event *event = &pool->events[fd];
     if (fd > pool->size) return SEV_ERR;
     if (sev_impl_add(pool, fd, flgs) != SEV_OK) return SEV_ERR;
+
     event->flgs |= flgs;
     if (event->flgs & SEV_R) event->read = proc;
     if (event->flgs & SEV_W) event->write = proc; 
     event->data = data;
+
     if (fd > pool->maxfd) pool->maxfd = fd;
     return SEV_OK;
 }
