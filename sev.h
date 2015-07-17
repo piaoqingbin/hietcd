@@ -76,7 +76,7 @@ sev_pool *sev_pool_create(int size);
 void sev_pool_destroy(sev_pool *pool);
 int sev_add_event(sev_pool *pool, int fd, int flgs, sev_file_proc *proc, void *data);
 void sev_del_event(sev_pool *pool, int fd, int flgs);
-int sev_process(sev_pool *pool);
-void sev_dispatch(sev_pool *pool);
+int sev_process(sev_pool *pool, struct timeval *tvp);
+void sev_dispatch(sev_pool *pool, struct timeval *tvp);
 
 #endif

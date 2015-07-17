@@ -100,11 +100,11 @@ void sev_del_event(sev_pool *pool, int fd, int flgs)
     }
 }
 
-int sev_process(sev_pool *pool)
+int sev_process(sev_pool *pool, struct timeval *tvp)
 {
     int i, num = 0;
 
-    num = sev_impl_poll(pool, NULL);
+    num = sev_impl_poll(pool, tvp);
     for (i = 0; i < num; i++) {
         int read = 0;
         sev_ready_event *ready = &pool->ready[i];
@@ -122,11 +122,11 @@ int sev_process(sev_pool *pool)
     return num;
 }
 
-void sev_dispatch(sev_pool *pool)
+void sev_dispatch(sev_pool *pool, struct timeval *tvp)
 {
     pool->done = 0;
     while (!pool->done) {
         if (pool->cron) pool->cron(pool);
-        sev_process(pool);
+        sev_process(pool, tvp);
     }
 }
