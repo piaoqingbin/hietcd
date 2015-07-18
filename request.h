@@ -28,32 +28,58 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _HIETCD_HIO_H_
-#define _HIETCD_HIO_H_
+#ifndef _HIETCD_REQUEST_H_
+#define _HIETCD_REQUEST_H_
 
-#include <pthread.h>
+/* Etcd request methods */
+#define HIETCD_REQUEST_GET "GET"
+#define HIETCD_REQUSET_POST "POST"
+#define HIETCD_REQUEST_PUT "PUT"
+#define HIETCD_REQUEST_DELETE "DELETE"
 
-#include <curl/curl.h>
+/* Etcd request queue */
+typedef struct etcd_request_queue etcd_rq;
 
-#include "sev.h"
-#include "request.h"
+/* Etcd request queue structure */
+struct etcd_request_queue {
+    etcd_rq *prev; 
+    etcd_rq *next; 
+};
 
-/* Etcd http io structure */
-typedef struct etcd_hio {
-    int stop;
-    int rfd; /* Readable pipe fd */
-    int size; /* Event pool size */
-    sev_pool *pool; /* Event pool */
-    struct timeval elt; /* Event loop timeout */
-    CURLM *cmh; /* CURL mutil handler */
-    etcd_rq rq; /* Request queue */
-    pthread_mutex_t rqlock;
-} etcd_hio;
+#define etcd_rq_init(q)             \
+    (q)->prev = (q);                \
+    (q)->next = (q)
 
-etcd_hio *etcd_hio_create(void);
-void etcd_hio_destroy(etcd_hio *io);
-void *etcd_hio_start(void *args);
-void etcd_hio_push_request(etcd_hio *io, etcd_request *req);
-etcd_request *etcd_hio_pop_request(etcd_hio *io);
+#define etcd_rq_empty(h)    ((h) == (h)->next)
+
+#define etcd_rq_insert(h,n)         \
+    (h)->next->prev = (n);          \
+    (n)->next = (h)->next;          \
+    (n)->prev = (h);                \
+    (h)->next = (n)
+
+#define etcd_rq_remove(n)           \
+    (n)->next->prev = (n)->prev;    \
+    (n)->prev->next = (n)->next
+
+#define etcd_rq_head(h)     ((h)->next)
+#define etcd_rq_last(h)     ((h)->prev)
+#define etcd_rq_prev(q)     ((q)->prev)
+#define etcd_rq_next(q)     ((q)->next)
+
+/* Etcd request structure */
+typedef struct {
+    char *url;
+    const char *method; /* [GET|POST|PUT|DELETE] */
+    const char *certfile;
+    char *data;
+    etcd_rq rq; 
+} etcd_request;
+
+#define etcd_request_set_data(r,d,l)    ((r)->data = strndup((d),(l)))
+#define etcd_request_set_certfile(r,c)  ((r)->certfile = (c))
+
+etcd_request *etcd_request_create(char *url, size_t len, const char *method);
+void etcd_request_destroy(etcd_request *req);
 
 #endif

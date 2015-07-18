@@ -34,6 +34,8 @@
 #include <string.h>
 
 #include "sev.h"
+#include "request.h"
+
 #include "hio.h"
 
 static void etcd_hio_cron(sev_pool *pool); 
@@ -41,7 +43,10 @@ static void etcd_hio_read(sev_pool *pool, int fd, void *data, int flgs);
 
 etcd_hio *etcd_hio_create(void)
 {
-    etcd_hio *io = malloc(sizeof(etcd_hio)); 
+    etcd_hio *io;
+    
+    if (!(io = malloc(sizeof(etcd_hio))))
+        return NULL;
 
     io->stop = 0;
     io->rfd = -1;
@@ -49,6 +54,8 @@ etcd_hio *etcd_hio_create(void)
     io->pool = NULL;
     io->cmh = NULL;
     memset(&io->elt, 0, sizeof(struct timeval));
+    etcd_rq_init(&io->rq);
+    pthread_mutex_init(&io->rqlock, NULL);
 
     return io;
 }
@@ -59,6 +66,8 @@ void etcd_hio_destroy(etcd_hio *io)
         sev_pool_destroy(io->pool);
     if (io->cmh)
         curl_multi_cleanup(io->cmh);
+    pthread_mutex_destroy(&io->rqlock);
+    free(io);
 }
 
 static void etcd_hio_read(sev_pool *pool, int fd, void *data, int flgs)
@@ -74,7 +83,7 @@ static void etcd_hio_cron(sev_pool *pool)
     fprintf(stderr, "polling...\n");
 }
 
-void *etcd_hio_startup(void *args)
+void *etcd_hio_start(void *args)
 {
     etcd_hio *io = (etcd_hio *) args;
     io->cmh = curl_multi_init();
@@ -83,4 +92,23 @@ void *etcd_hio_startup(void *args)
     sev_set_cron(io->pool, etcd_hio_cron);
     sev_dispatch(io->pool, &io->elt);
     return NULL;
+}
+
+void etcd_hio_push_request(etcd_hio *io, etcd_request *req)
+{
+    pthread_mutex_lock(&io->rqlock);
+    etcd_rq_insert(io->rq, req->rq);
+    pthread_mutex_unlock(&io->rqlock);
+}
+
+etcd_request *etcd_hio_pop_request(etcd_hio *io)
+{
+    etcd_request *req = NULL;
+    pthread_mutex_lock(&io->rqlock);
+    if (!etcd_rq_empty(io->rq)) {
+        req = etcd_rq_last(io->rq); 
+        etcd_rq_remove(req->rq); 
+    }
+    pthread_mutex_unlock(&io->rqlock);
+    return req;
 }

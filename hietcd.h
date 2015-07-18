@@ -38,6 +38,10 @@
 #define HIETCD_OK 0
 #define HIETCD_ERR -1
 
+/* Client/Server version */
+#define HIETCD_VERSION "0.02"
+#define HIETCD_SERVER_VERSION "v2"
+
 #define HIETCD_ERR_CURL -2 /* CURL error */
 #define HIETCD_ERR_PROTOCOL -3 /* Protocol error */
 #define HIETCD_ERR_RESPONSE -4 /* Etcd response error */
@@ -50,8 +54,8 @@
 
 /* Request/Response buffer size */
 #define HIETCD_REQ_BUFSIZE (1024*1)
-#define HIETCD_ERR_BUFSIZE 128
 #define HIETCD_RESP_BUFSIZE (1024*4)
+#define HIETCD_ERR_BUFSIZE 128
 
 /* Etcd response headers */
 #define HIETCD_HEADER_ECID "X-Etcd-Cluster-Id"
@@ -106,11 +110,11 @@ typedef void etcd_response_proc(etcd_client *client,
 
 /* Etcd client structure */
 typedef struct etcd_client {
-    char cacert[256];
     short timeout;
     short conntimeout;
     short keepalive;
     short snum; /* number of servers */
+    char *certfile;
     char *servers[HIETCD_MAX_NODE_NUM];
     int wfd; /* Writable pipe fd */
     etcd_hio *io; /* http io thread */
@@ -126,9 +130,11 @@ void etcd_response_destroy(etcd_response *resp);
 etcd_client *etcd_client_create(void);
 void etcd_client_destroy(etcd_client *client);
 
+void etcd_async_start(etcd_client *client);
+void etcd_async_stop(etcd_client *client);
+
 /* Async api */
-void etcd_async_startup(etcd_client *client);
-int etcd_amkdir(etcd_client *client, const char *key, long long ttl);
+int etcd_amkdir(etcd_client *client, const char *key, size_t len, long long ttl);
 
 /*
 etcd_client *etcd_client_create(void);

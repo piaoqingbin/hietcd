@@ -28,32 +28,30 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _HIETCD_HIO_H_
-#define _HIETCD_HIO_H_
+#include <stdlib.h>
+#include <string.h>
 
-#include <pthread.h>
-
-#include <curl/curl.h>
-
-#include "sev.h"
 #include "request.h"
 
-/* Etcd http io structure */
-typedef struct etcd_hio {
-    int stop;
-    int rfd; /* Readable pipe fd */
-    int size; /* Event pool size */
-    sev_pool *pool; /* Event pool */
-    struct timeval elt; /* Event loop timeout */
-    CURLM *cmh; /* CURL mutil handler */
-    etcd_rq rq; /* Request queue */
-    pthread_mutex_t rqlock;
-} etcd_hio;
+etcd_request *etcd_request_create(char *url, size_t len, const char *method)
+{
+    etcd_request *req;
 
-etcd_hio *etcd_hio_create(void);
-void etcd_hio_destroy(etcd_hio *io);
-void *etcd_hio_start(void *args);
-void etcd_hio_push_request(etcd_hio *io, etcd_request *req);
-etcd_request *etcd_hio_pop_request(etcd_hio *io);
+    if (!(req = malloc(sizeof(etcd_request))))
+        return NULL;
 
-#endif
+    req->url = strndup(url, len);
+    req->method = method;
+    req->certfile = NULL;
+    req->data = NULL;
+    etcd_rq_init(req->rq);
+
+    return req;
+}
+
+void etcd_request_destroy(etcd_request *req)
+{
+    free(req->url);
+    if (req->data) free(req->data);
+    free(req);
+}
