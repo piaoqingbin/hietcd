@@ -35,7 +35,7 @@
 #include <time.h>
 #include <pthread.h>
 
-#include "etcd_log.h"
+#include "log.h"
 
 etcd_log_level etcd_ll = ETCD_LOG_LEVEL_INFO;
 
