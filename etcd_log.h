@@ -28,56 +28,37 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _HIETCD_REQUEST_H_
-#define _HIETCD_REQUEST_H_
+#ifndef _ETCD_LOG_H_
+#define _ETCD_LOG_H_
 
-/* Etcd request methods */
-#define HIETCD_REQUEST_GET "GET"
-#define HIETCD_REQUSET_POST "POST"
-#define HIETCD_REQUEST_PUT "PUT"
-#define HIETCD_REQUEST_DELETE "DELETE"
+#include <stdio.h>
 
-/* Etcd request queue */
-typedef struct etcd_request_queue etcd_rq;
+#define ETCD_LOG_TIME_BUFSIZE 128
+#define ETCD_LOG_MSG_BUFSIZE 4096
 
-struct etcd_request_queue {
-    etcd_rq *prev; 
-    etcd_rq *next; 
-};
+/* Etcd log levels */
+typedef enum {
+    ETCD_LOG_LEVEL_ERROR = 1,
+    ETCD_LOG_LEVEL_WARN = 2,
+    ETCD_LOG_LEVEL_INFO = 3,
+    ETCD_LOG_LEVEL_DEBUG = 4
+} etcd_log_level;
 
-#define etcd_rq_init(q)             \
-    (q)->prev = (q);                \
-    (q)->next = (q)
+extern etcd_log_level etcd_ll;
 
-#define etcd_rq_insert(h,n)         \
-    (h)->next->prev = (n);          \
-    (n)->next = (h)->next;          \
-    (n)->prev = (h);                \
-    (h)->next = (n)
+#define ETCD_LOG_ERROR(...)   if (etcd_ll >= ETCD_LOG_LEVEL_ERROR) \
+    etcd_log(ETCD_LOG_LEVEL_ERROR, __LINE__, __func__, __VA_ARGS__)
+#define ETCD_LOG_WARN(...)   if (etcd_ll >= ETCD_LOG_LEVEL_WARN) \
+    etcd_log(ETCD_LOG_LEVEL_WARN, __LINE__, __func__, __VA_ARGS__)
+#define ETCD_LOG_INFO(...)   if (etcd_ll >= ETCD_LOG_LEVEL_INFO) \
+    etcd_log(ETCD_LOG_LEVEL_INFO, __LINE__, __func__, __VA_ARGS__)
+#define ETCD_LOG_DEBUG(...)   if (etcd_ll >= ETCD_LOG_LEVEL_DEBUG) \
+    etcd_log(ETCD_LOG_LEVEL_DEBUG, __LINE__, __func__, __VA_ARGS__)
 
-#define etcd_rq_remove(n)           \
-    (n)->next->prev = (n)->prev;    \
-    (n)->prev->next = (n)->next
-
-#define etcd_rq_empty(h)    ((h) == (h)->next)
-#define etcd_rq_head(h)     ((h)->next)
-#define etcd_rq_last(h)     ((h)->prev)
-#define etcd_rq_prev(q)     ((q)->prev)
-#define etcd_rq_next(q)     ((q)->next)
-
-/* Etcd request structure */
-typedef struct {
-    char *url; /* http://host:port/path/to/key?foo=bar */
-    const char *method; /* http method */
-    const char *certfile;
-    char *data;
-    etcd_rq rq; 
-} etcd_request;
-
-#define etcd_request_set_data(r,d,l)    ((r)->data = strndup((d),(l)))
-#define etcd_request_set_certfile(r,c)  ((r)->certfile = (c))
-
-etcd_request *etcd_request_create(char *url, size_t len, const char *method);
-void etcd_request_destroy(etcd_request *req);
+FILE *get_log_handler();
+void etcd_set_log_level(etcd_log_level level);
+void etcd_set_log_handler(FILE *handler);
+void etcd_log(etcd_log_level etcd_ll, int line, const char *func, 
+        const char *fmt, ...);
 
 #endif

@@ -171,7 +171,7 @@ void etcd_async_start(etcd_client *client)
 
 static inline int etcd_async_send_request(etcd_client *client, etcd_request *req)
 {
-    if (client->io) return HIETCD_ERR;
+    if (!client->io) return HIETCD_ERR;
     if (client->certfile) 
         etcd_request_set_certfile(req, client->certfile);
     etcd_hio_push_request(client->io, req); 
@@ -194,8 +194,7 @@ int etcd_amkdir(etcd_client *client, const char *key, size_t len, long long ttl)
 {
     int n;
     etcd_request *req;
-    char url[HIETCD_URL_BUFSIZE] = {0}; 
-    char post[9] = "dir=true";
+    char url[HIETCD_URL_BUFSIZE] = {0}, char data[9] = "dir=true"; 
 
     n = etcd_gen_url(client, key, url);
     if (ttl > 0) 
@@ -203,7 +202,7 @@ int etcd_amkdir(etcd_client *client, const char *key, size_t len, long long ttl)
 
     req = etcd_request_create(url, n, HIETCD_REQUEST_PUT);
     if (req == NULL) return HIETCD_ERR;
-    etcd_request_set_data(req, post, sizeof(post));
+    etcd_request_set_data(req, data, sizeof(data));
 
     return etcd_async_send_request(client, req);
 }
