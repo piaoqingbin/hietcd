@@ -97,16 +97,16 @@ void etcd_log(etcd_log_level etcd_ll, int line, const char *func,
         const char *fmt, ...)
 {
     static pid_t pid = 0;
+    char *time_buf, *msg_buf;
     struct timeval tv;
     struct tm lt;
-    time_t now = 0;
     va_list va;
+    time_t now = 0;
     int n = 0;
 
     if (pid == 0) pid = getpid();
 
-    // time
-    char *time_buf = get_thread_buf(time_buf_key, ETCD_LOG_TIME_BUFSIZE); 
+    time_buf = get_thread_buf(time_buf_key, ETCD_LOG_TIME_BUFSIZE); 
     gettimeofday(&tv,0);
     now = tv.tv_sec;
     localtime_r(&now, &lt);
@@ -114,11 +114,10 @@ void etcd_log(etcd_log_level etcd_ll, int line, const char *func,
     n += snprintf(time_buf + n, ETCD_LOG_TIME_BUFSIZE - n, ".%03d",
         (int)(tv.tv_usec/1000));
 
-    // msg
-    char *msg_buf = get_thread_buf(msg_buf_key, ETCD_LOG_MSG_BUFSIZE);
+    *msg_buf = get_thread_buf(msg_buf_key, ETCD_LOG_MSG_BUFSIZE);
     n = snprintf(msg_buf, ETCD_LOG_MSG_BUFSIZE, "%s (%ld-0x%lx,%s@%d) [%s]: ", 
         time_buf, (long) pid, (unsigned long int)(pthread_self()), 
-        func, line, log_level_str[etcd_ll]/*, func, line*/);
+        func, line, log_level_str[etcd_ll]);
 
     va_start(va, fmt);
     vsnprintf(msg_buf + n, ETCD_LOG_MSG_BUFSIZE - 1 - n, fmt, va);
