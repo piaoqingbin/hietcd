@@ -64,6 +64,7 @@ struct etcd_request_queue {
 #define etcd_rq_last(h)     ((h)->prev)
 #define etcd_rq_prev(q)     ((q)->prev)
 #define etcd_rq_next(q)     ((q)->next)
+#define etcd_rq_getreq(q)   ((etcd_request *)((size_t)q-(4*sizeof(void *))))
 
 /* Etcd request structure */
 typedef struct {

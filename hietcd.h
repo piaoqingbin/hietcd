@@ -33,7 +33,7 @@
 
 #include <curl/curl.h>
 
-#include "hio.h"
+#include "io.h"
 
 #define HIETCD_OK 0
 #define HIETCD_ERR -1
@@ -117,7 +117,8 @@ typedef struct etcd_client {
     char *certfile;
     char *servers[HIETCD_MAX_NODE_NUM];
     int wfd; /* Writable pipe fd */
-    etcd_hio *io; /* http io thread */
+    etcd_io *io; /* io thread */
+    pthread_t tid; /* thread id */
 } etcd_client;
 
 etcd_node *etcd_node_create(void);
@@ -130,8 +131,8 @@ void etcd_response_destroy(etcd_response *resp);
 etcd_client *etcd_client_create(void);
 void etcd_client_destroy(etcd_client *client);
 
-void etcd_async_start(etcd_client *client);
-void etcd_async_stop(etcd_client *client);
+int etcd_start_io_thread(etcd_client *client);
+void etcd_stop_io_thread(etcd_client *client);
 
 /* Async api */
 int etcd_amkdir(etcd_client *client, const char *key, size_t len, long long ttl);

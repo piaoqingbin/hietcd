@@ -32,7 +32,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdarg.h>
-#include <time.h>
+//#include <time.h>
+#include <sys/time.h>
 #include <pthread.h>
 
 #include "log.h"
@@ -114,7 +115,7 @@ void etcd_log(etcd_log_level etcd_ll, int line, const char *func,
     n += snprintf(time_buf + n, ETCD_LOG_TIME_BUFSIZE - n, ".%03d",
         (int)(tv.tv_usec/1000));
 
-    *msg_buf = get_thread_buf(msg_buf_key, ETCD_LOG_MSG_BUFSIZE);
+    msg_buf = get_thread_buf(msg_buf_key, ETCD_LOG_MSG_BUFSIZE);
     n = snprintf(msg_buf, ETCD_LOG_MSG_BUFSIZE, "%s (%ld-0x%lx,%s@%d) [%s]: ", 
         time_buf, (long) pid, (unsigned long int)(pthread_self()), 
         func, line, log_level_str[etcd_ll]);

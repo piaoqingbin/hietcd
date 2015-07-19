@@ -29,18 +29,26 @@
  */
 #include <stdlib.h>
 #include <string.h>
-#include<unistd.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <pthread.h>
 
 #include <curl/curl.h>
 
 #include "hietcd.h"
+#include "log.h"
 #include "request.h"
+#include "io.h"
 
 static inline void etcd_response_init(etcd_response *resp);
+static int set_nonblock(int fd);
+static int notify_io_thread(etcd_client *client);
+/*
 static int etcd_gen_url(etcd_client *client, const char *key, char *url);
 static inline int etcd_async_send_request(etcd_client *client, 
         etcd_request *req);
+*/
 
 etcd_node *etcd_node_create(void)
 {
@@ -140,34 +148,65 @@ void etcd_client_destroy(etcd_client *client)
     free(client); 
 }
 
-void etcd_async_start(etcd_client *client)
+int etcd_start_io_thread(etcd_client *client)
 {
-    if (client->io == NULL) {
-        int fds[2] = {0};
+    if (client->io != NULL) return HIETCD_OK;
 
-        // create hio
-        etcd_hio *io = etcd_hio_create();
-        if (!io) {
-            // TODO 
-        }
-        client->io = io;
-
-        if (pipe(fds) == -1) {
-            // TODO 
-            return;
-        }
-
-        client->wfd = fds[1];
-
-        // Configure
-        io->rfd = fds[0];
-        io->elt.tv_sec = 10;
-        io->elt.tv_usec = 0;
-        io->size = 1024;
-
-        pthread_create(&io->tid, NULL, etcd_hio_start, (void *)io); 
+    etcd_io *io;
+    if ((io = etcd_io_create()) == NULL) {
+        ETCD_LOG_ERROR("Out of memory");
+        return HIETCD_ERR;
     }
+
+    int fds[2] = {0};
+
+    if (pipe(fds) == -1) {
+        free(io); 
+        ETCD_LOG_ERROR("Can't make a pipe %d",errno);
+        return HIETCD_ERR;
+    }
+    set_nonblock(fds[0]);
+    set_nonblock(fds[1]);
+
+    io->rfd = fds[0];
+    io->elt.tv_sec = 3;
+    io->elt.tv_usec = 0;
+    io->size = 1024;
+
+    ETCD_LOG_DEBUG("Starting IO thread...");
+    pthread_create(&client->tid, 0, etcd_io_start, (void *)io);
+
+    pthread_mutex_lock(&io->lock);
+    while (io->ready != 1) 
+        pthread_cond_wait(&io->cond, &io->lock);
+    pthread_mutex_unlock(&io->lock); 
+
+    client->wfd = fds[1];
+    client->io = io;
+    return HIETCD_OK;
 }
+
+void etcd_stop_io_thread(etcd_client *client)
+{
+    etcd_io_stop(client->io);
+    notify_io_thread(client); 
+    pthread_join(client->tid, 0);
+}
+
+static int notify_io_thread(etcd_client *client)
+{
+    char c = 0;
+    return write(client->wfd, &c, 1) == 1 ? HIETCD_OK : HIETCD_ERR;
+}
+
+static int set_nonblock(int fd)
+{
+    long l = fcntl(fd, F_GETFL);
+    if(l & O_NONBLOCK) return 0;
+    return fcntl(fd, F_SETFL, l | O_NONBLOCK);
+}
+
+/*
 
 static inline int etcd_async_send_request(etcd_client *client, etcd_request *req)
 {
@@ -206,6 +245,7 @@ int etcd_amkdir(etcd_client *client, const char *key, size_t len, long long ttl)
 
     return etcd_async_send_request(client, req);
 }
+*/
 
 /*
 int etcd_add_server(etcd_client *client, const char *server, size_t len)

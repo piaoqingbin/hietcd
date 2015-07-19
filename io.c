@@ -35,20 +35,20 @@
 
 #include "sev.h"
 #include "request.h"
+#include "log.h"
+#include "io.h"
 
-#include "hio.h"
+static void etcd_io_cron(sev_pool *pool); 
+static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs);
 
-static void etcd_hio_cron(sev_pool *pool); 
-static void etcd_hio_read(sev_pool *pool, int fd, void *data, int flgs);
-
-etcd_hio *etcd_hio_create(void)
+etcd_io *etcd_io_create(void)
 {
-    etcd_hio *io;
+    etcd_io *io;
     
-    if (!(io = malloc(sizeof(etcd_hio))))
+    if (!(io = malloc(sizeof(etcd_io))))
         return NULL;
 
-    io->stop = 0;
+    io->ready = 0;
     io->rfd = -1;
     io->size = -1;
     io->pool = NULL;
@@ -57,20 +57,25 @@ etcd_hio *etcd_hio_create(void)
     etcd_rq_init(&io->rq);
     pthread_mutex_init(&io->rqlock, NULL);
 
+    pthread_cond_init(&io->cond, 0);
+    pthread_mutex_init(&io->lock, 0);
+
     return io;
 }
 
-void etcd_hio_destroy(etcd_hio *io)
+void etcd_io_destroy(etcd_io *io)
 {
     if (io->pool) 
         sev_pool_destroy(io->pool);
     if (io->cmh)
         curl_multi_cleanup(io->cmh);
     pthread_mutex_destroy(&io->rqlock);
+    pthread_mutex_destroy(&io->lock);
+    pthread_cond_destroy(&io->cond);
     free(io);
 }
 
-static void etcd_hio_read(sev_pool *pool, int fd, void *data, int flgs)
+static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs)
 {
     char buf[32] = {0};
     size_t len = 32;
@@ -78,36 +83,52 @@ static void etcd_hio_read(sev_pool *pool, int fd, void *data, int flgs)
     fprintf(stderr, "read:%s\n", buf);
 }
 
-static void etcd_hio_cron(sev_pool *pool) 
+static void etcd_io_cron(sev_pool *pool) 
 {
     fprintf(stderr, "polling...\n");
 }
 
-void *etcd_hio_start(void *args)
+void *etcd_io_start(void *args)
 {
-    etcd_hio *io = (etcd_hio *) args;
+    etcd_io *io = (etcd_io *) args;
     io->cmh = curl_multi_init();
     io->pool = sev_pool_create(io->size);
-    sev_add_event(io->pool, io->rfd, SEV_R, etcd_hio_read, NULL);
-    sev_set_cron(io->pool, etcd_hio_cron);
+    sev_add_event(io->pool, io->rfd, SEV_R, etcd_io_read, NULL);
+    sev_set_cron(io->pool, etcd_io_cron);
+    
+    // notify
+    pthread_mutex_lock(&io->lock);
+    io->ready = 1;
+    pthread_cond_broadcast(&io->cond);
+    pthread_mutex_unlock(&io->lock);
+
+    // dispatch
+    ETCD_LOG_DEBUG("Started IO thread");
     sev_dispatch(io->pool, &io->elt);
+    ETCD_LOG_DEBUG("IO thread terminated");
     return NULL;
 }
 
-void etcd_hio_push_request(etcd_hio *io, etcd_request *req)
+void etcd_io_stop(etcd_io *io)
+{
+    io->pool->done = 1;
+}
+
+void etcd_io_push_request(etcd_io *io, etcd_request *req)
 {
     pthread_mutex_lock(&io->rqlock);
-    etcd_rq_insert(io->rq, req->rq);
+    etcd_rq_insert(&io->rq, &req->rq);
     pthread_mutex_unlock(&io->rqlock);
 }
 
-etcd_request *etcd_hio_pop_request(etcd_hio *io)
+etcd_request *etcd_io_pop_request(etcd_io *io)
 {
     etcd_request *req = NULL;
     pthread_mutex_lock(&io->rqlock);
-    if (!etcd_rq_empty(io->rq)) {
-        req = etcd_rq_last(io->rq); 
-        etcd_rq_remove(req->rq); 
+    if (!etcd_rq_empty(&io->rq)) {
+        etcd_rq *rq = etcd_rq_last(&io->rq); 
+        req = etcd_rq_getreq(rq);
+        etcd_rq_remove(rq); 
     }
     pthread_mutex_unlock(&io->rqlock);
     return req;
