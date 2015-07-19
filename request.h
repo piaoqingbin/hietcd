@@ -32,10 +32,10 @@
 #define _HIETCD_REQUEST_H_
 
 /* Etcd request methods */
-#define HIETCD_REQUEST_GET "GET"
-#define HIETCD_REQUSET_POST "POST"
-#define HIETCD_REQUEST_PUT "PUT"
-#define HIETCD_REQUEST_DELETE "DELETE"
+#define ETCD_REQUEST_GET "GET"
+#define ETCD_REQUSET_POST "POST"
+#define ETCD_REQUEST_PUT "PUT"
+#define ETCD_REQUEST_DELETE "DELETE"
 
 /* Etcd request queue */
 typedef struct etcd_request_queue etcd_rq;

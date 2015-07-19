@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _ETCD_LOG_H_
-#define _ETCD_LOG_H_
+#ifndef _HIETCD_LOG_H_
+#define _HIETCD_LOG_H_
 
 #include <stdio.h>
 
