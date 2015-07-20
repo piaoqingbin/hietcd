@@ -31,13 +31,21 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "sev.h"
 #include "sev_impl.c"
 
+static inline void sev_time_now(long *sec, long *msec);
+static void sev_time_add_now(long long time_ms, long *sec, long *msec);
+static int sev_timer_cmp(sev_timer *tm, sev_timer *ts);
+static inline void sev_timer_swap(sev_timer **tm, sev_timer **ts);
+static int sev_timers_resize(sev_pool *pool, int flgs);
+
 sev_pool *sev_pool_create(int size)
 {
     sev_pool *pool;
+    sev_timer **timers;
 
     if ((pool = malloc(sizeof(sev_pool))) == NULL) 
         goto create_err; 
@@ -52,6 +60,16 @@ sev_pool *sev_pool_create(int size)
     if (sev_impl_create(pool) != SEV_OK)
         goto create_err;
     memset((void *)pool->events, 0, sizeof(sev_file_event) * size);
+
+    pool->tmaxid = 0;
+    pool->tnum = 0;
+    pool->tmaxnum = SEV_DEFAULT_HEAPSIZE;
+    if ((timers = malloc(sizeof(sev_timer*) * pool->tmaxnum)) == NULL)
+        goto create_err;
+
+    memset((void *)timers, 0, sizeof(sev_timer*) * pool->tmaxnum);
+    pool->timers = timers;
+
     return pool;
 
 create_err:
@@ -68,6 +86,7 @@ void sev_pool_destroy(sev_pool *pool)
     if (pool->events) free(pool->events);
     if (pool->ready) free(pool->ready);
     if (pool->impl) sev_impl_destroy(pool);
+    if (pool->timers) free(pool->timers);
     free(pool);
 }
 
@@ -100,6 +119,110 @@ void sev_del_event(sev_pool *pool, int fd, int flgs)
             pool->maxfd--;
         } while (pool->maxfd > 0 && pool->events[pool->maxfd].flgs == SEV_N);
     }
+}
+
+static inline void sev_time_now(long *sec, long *msec)
+{
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    *sec = tv.tv_sec;
+    *msec = tv.tv_usec/1000;
+}
+
+static void sev_time_add_now(long long time_ms, long *sec, long *msec)
+{
+    sev_time_now(sec, msec);
+    *sec += time_ms / 1000;
+    *msec += time_ms % 1000;
+    if (*msec > 1000) {
+        *sec += 1;
+        *msec -= 1000; 
+    }
+}
+
+/* [tm>ts,1|tm<ts,-1|tm==ts,0] */
+static int sev_timer_cmp(sev_timer *tm, sev_timer *ts)
+{
+    if (tm->sec == ts->sec) {
+        if (tm->msec == ts->msec)
+            return 0; 
+        else if (tm->msec > ts->msec)
+            return 1;
+        else
+            return -1;
+    } else if (tm->sec > ts->sec)
+        return 1; 
+    else 
+        return -1;
+}
+
+static inline void sev_timer_swap(sev_timer **tm, sev_timer **ts)
+{
+    sev_timer *tmp;
+    tmp = *tm;
+    *tm = *ts; 
+    *ts = tmp;
+}
+
+static int sev_timers_resize(sev_pool *pool, int flgs)
+{
+    sev_timer **timers;
+    long tmaxnum = 0;
+
+    if (flgs > 0) {
+        tmaxnum = pool->tmaxnum << 1;
+        if (tmaxnum > SEV_MAX_HEAPSIZE) return SEV_ERR;
+
+        timers = malloc(sizeof(sev_timer*) * tmaxnum);
+        if (timers == NULL) return SEV_ERR;
+        memset(timers, 0, sizeof(sev_timer*) * tmaxnum);
+
+        pool->tmaxnum = tmaxnum;
+        memcpy(timers, pool->timers, sizeof(sev_timer*) * pool->tnum);
+        free(pool->timers);
+        pool->timers = timers;
+
+    } else {
+    
+    }
+    return SEV_OK;
+}
+
+long long sev_add_timer(sev_pool *pool, long long timeout_ms, 
+        sev_timer_proc *proc, void *data)
+{
+    sev_timer *timer;
+    int i, j;
+
+    if ((timer = malloc(sizeof(sev_timer))) == NULL)
+        return 0;
+
+    if (pool->tnum >= pool->tmaxnum) {
+        if (sev_timers_resize(pool, 1) != SEV_OK)
+            return 0;
+    }
+
+    timer->id = ++pool->tmaxid;
+    timer->proc = proc;
+    timer->data = data;
+    sev_time_add_now(timeout_ms, &timer->sec, &timer->msec); 
+
+    i = pool->tnum;
+    pool->timers[pool->tnum++] = timer;
+    while (i > 0) {
+        j = SEV_TIMER_PARENT(i);
+        if (sev_timer_cmp(pool->timers[i], pool->timers[j]) < 0)
+            sev_timer_swap(&pool->timers[i], &pool->timers[j]);
+        i = j;
+    }
+
+    return timer->id;
+}
+
+int sev_del_timer(sev_pool *pool, long long id)
+{
+    return SEV_OK;
 }
 
 int sev_process(sev_pool *pool, struct timeval *tvp)
