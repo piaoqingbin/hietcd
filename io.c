@@ -88,10 +88,9 @@ static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs)
         etcd_io *io = (etcd_io *) data;
         etcd_request *req;
 
-        fprintf(stderr, "read:%s\n", buf);
         req = etcd_io_pop_request(io);
         if (req != NULL) {
-            fprintf(stderr, "req->url:%s\n", req->url);
+            ETCD_LOG_DEBUG("etcd_io_pop_request: %s", req->url);
             etcd_io_dispatch(io, req);
             etcd_request_destroy(req);
         }
@@ -100,7 +99,7 @@ static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs)
 
 static void etcd_io_cron(sev_pool *pool) 
 {
-    fprintf(stderr, "polling...\n");
+    ETCD_LOG_DEBUG("running ...");
 }
 
 static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
@@ -125,8 +124,10 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
     curl_easy_setopt(ch, CURLOPT_FORBID_REUSE, 1);
     curl_easy_setopt(ch, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(ch, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
-    curl_easy_setopt(ch, CURLOPT_TIMEOUT, 1);
-    curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, 1);
+    /*
+    curl_easy_setopt(ch, CURLOPT_TIMEOUT, 3);
+    curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, 3);
+    */
 
     curl_easy_setopt(ch, CURLOPT_URL, req->url);
     curl_easy_setopt(ch, CURLOPT_CUSTOMREQUEST, req->method);
@@ -144,6 +145,7 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
         goto io_dispatch_err;
     }
 
+    ETCD_LOG_DEBUG("curl_multi_add_handle: succ");
     return;
 
 io_dispatch_err:
@@ -155,7 +157,7 @@ static int etcd_io_sock_cb(CURL *ch, curl_socket_t s, int what,
 {
     etcd_io *io = (etcd_io *) cbp; 
 
-    fprintf(stderr, "what:%d\n", what);
+    ETCD_LOG_DEBUG("what: %d", what);
     return 0;
 }
 
@@ -170,7 +172,7 @@ static int etcd_io_timer_cb(CURLM *cmh, long timeout_ms, etcd_io *io)
     fprintf(MSG_OUT, "multi_timer_cb: Setting timeout to %ld ms\n", timeout_ms);
     evtimer_add(g->timer_event, &timeout);
     */
-    fprintf(stderr, "multi_timer_cb\n");
+    ETCD_LOG_DEBUG("timeout_ms: %d", timeout_ms);
     return 0;
 }
 
