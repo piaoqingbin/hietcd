@@ -63,7 +63,7 @@ sev_pool *sev_pool_create(int size)
 
     pool->tmaxid = 0;
     pool->tnum = 0;
-    pool->tmaxnum = SEV_DEFAULT_HEAPSIZE;
+    pool->tmaxnum = SEV_TIMER_DEFAULT_SIZE;
     if ((timers = malloc(sizeof(sev_timer*) * pool->tmaxnum)) == NULL)
         goto create_err;
 
@@ -172,7 +172,7 @@ static int sev_timers_resize(sev_pool *pool, int flgs)
 
     if (flgs > 0) {
         tmaxnum = pool->tmaxnum << 1;
-        if (tmaxnum > SEV_MAX_HEAPSIZE) return SEV_ERR;
+        if (tmaxnum > SEV_TIMER_MAX_SIZE) return SEV_ERR;
 
         timers = malloc(sizeof(sev_timer*) * tmaxnum);
         if (timers == NULL) return SEV_ERR;
@@ -222,6 +222,20 @@ long long sev_add_timer(sev_pool *pool, long long timeout_ms,
 
 int sev_del_timer(sev_pool *pool, long long id)
 {
+    /*
+    int i;
+    sev_timer *timer = NULL;
+
+    for (i = 0; i < pool->tnum; i++) {
+        if (pool->timers[i]->id == id) {
+            timer = pool->timers[i];
+            break;
+        } 
+    }
+
+    if (timer == NULL) return SEV_ERR;
+    */
+        
     return SEV_OK;
 }
 
