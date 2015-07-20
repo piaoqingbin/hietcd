@@ -187,13 +187,16 @@ static void sev_impl_del(sev_pool *pool, int fd, int flgs)
 
 static int sev_impl_poll(sev_pool *pool, struct timeval *tvp)
 {
+    struct timeval tv;
     sev_impl *impl = pool->impl;
     int fd, num = 0; /* number of events */
 
+    tv.tv_sec = tvp->tv_sec;
+    tv.tv_usec = tvp->tv_usec;
     memcpy(&impl->_rset, &impl->rset, sizeof(fd_set));
     memcpy(&impl->_wset, &impl->wset, sizeof(fd_set));
 
-    if (select(pool->maxfd+1, &impl->_rset, &impl->_wset, NULL, tvp) > 0) {
+    if (select(pool->maxfd+1, &impl->_rset, &impl->_wset, NULL, &tv) > 0) {
         for (fd = 0; fd <= pool->maxfd; fd++, num++) {
             int flgs = 0;
             sev_file_event *event = &pool->events[fd];  
