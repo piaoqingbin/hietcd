@@ -44,14 +44,14 @@ etcd_request *etcd_request_create(char *url, size_t len, const char *method)
     req->method = method;
     req->certfile = NULL;
     req->data = NULL;
-    etcd_rq_init(req->rq);
+    etcd_rq_init(&req->rq);
 
     return req;
 }
 
 void etcd_request_destroy(etcd_request *req)
 {
-    free(req->url);
+    if (req->url) free(req->url);
     if (req->data) free(req->data);
     free(req);
 }

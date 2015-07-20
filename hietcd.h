@@ -42,71 +42,13 @@
 #define HIETCD_VERSION "0.02"
 #define HIETCD_SERVER_VERSION "v2"
 
-#define HIETCD_ERR_CURL -2 /* CURL error */
-#define HIETCD_ERR_PROTOCOL -3 /* Protocol error */
-#define HIETCD_ERR_RESPONSE -4 /* Etcd response error */
-
 #define HIETCD_MAX_NODE_NUM 11
 
 #define HIETCD_DEFAULT_TIMEOUT 30
 #define HIETCD_DEFAULT_CONNTIMEOUT 1
 #define HIETCD_DEFAULT_KEEPALIVE 1
 
-/* Request/Response buffer size */
-#define HIETCD_REQ_BUFSIZE (1024*1)
-#define HIETCD_RESP_BUFSIZE (1024*4)
-#define HIETCD_ERR_BUFSIZE 128
-
-/* Etcd response headers */
-#define HIETCD_HEADER_ECID "X-Etcd-Cluster-Id"
-#define HIETCD_HEADER_EIDX "X-Etcd-Index"
-#define HIETCD_HEADER_RIDX "X-Raft-Index"
-#define HIETCD_HEADER_RTERM "X-Raft-Term"
-
-/* Etcd response actions */
-#define HIETCD_ACTION_SET "set"
-#define HIETCD_ACTION_CREATE "create"
-#define HIETCD_ACTION_UPDATE "update"
-#define HIETCD_ACTION_DELETE "delete"
-
-/* Etcd node structure */
-typedef struct etcd_node {
-    char *key;
-    char *value;
-    int isdir;
-    int ttl; /* time to live */
-    char expr[32]; /* expiration */
-    long long cidx; /* created Index */
-    long long midx; /* modified Index */
-    struct etcd_node *snode; /* sibling node */
-    struct etcd_node *cnode; /* child node */
-    unsigned long long ccount; /* number of childs */
-} etcd_node;
-
-/* Etcd http response structure */
-typedef struct {
-    CURLcode ccode; /* CURLcode */
-    int hcode; /* http status code */
-    int errcode;
-    char errmsg[HIETCD_ERR_BUFSIZE];
-    /* response headers */
-    char cluster[16]; /* cluster id */
-    long long idx; /* etcd index */
-    long long ridx; /* raft index */
-    long long rterm; /* raft term */
-    /* response data */
-    char data[HIETCD_RESP_BUFSIZE];
-    char action[16];
-    etcd_node *node;
-    etcd_node *pnode; /* prev node */
-} etcd_response;
-
-struct etcd_client;
-
-/*
-typedef void etcd_response_proc(etcd_client *client, 
-    etcd_response *resp, void *data);
-*/
+#define HIETCD_URL_BUFSIZE 512
 
 /* Etcd client structure */
 typedef struct etcd_client {
@@ -120,13 +62,6 @@ typedef struct etcd_client {
     etcd_io *io; /* io thread */
     pthread_t tid; /* thread id */
 } etcd_client;
-
-etcd_node *etcd_node_create(void);
-void etcd_node_destroy(etcd_node *node);
-
-etcd_response *etcd_response_create(void);
-void etcd_response_cleanup(etcd_response *resp);
-void etcd_response_destroy(etcd_response *resp);
 
 etcd_client *etcd_client_create(void);
 void etcd_client_destroy(etcd_client *client);

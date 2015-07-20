@@ -38,91 +38,13 @@
 
 #include "hietcd.h"
 #include "log.h"
-#include "request.h"
 #include "io.h"
+#include "request.h"
 
-static inline void etcd_response_init(etcd_response *resp);
-static int set_nonblock(int fd);
-static int notify_io_thread(etcd_client *client);
-/*
-static int etcd_gen_url(etcd_client *client, const char *key, char *url);
-static inline int etcd_async_send_request(etcd_client *client, 
-        etcd_request *req);
-*/
-
-etcd_node *etcd_node_create(void)
-{
-    etcd_node *node;
-    
-    if (!(node = malloc(sizeof(etcd_node))))
-        return NULL;
-
-    node->key = NULL;
-    node->value = NULL;
-    node->isdir = 0;
-    node->ttl = -1;
-    node->expr[0] = '\0';
-    node->cidx = -1;
-    node->midx = -1;
-    node->snode = NULL;
-    node->cnode = NULL;
-    node->ccount = 0;
-
-    return node;
-}
-
-void etcd_node_destroy(etcd_node *node)
-{
-    if (node) {
-        if (node->key) free(node->key); 
-        if (node->value) free(node->value);
-        if (node->snode) 
-            etcd_node_destroy(node->snode);
-        if (node->cnode)
-            etcd_node_destroy(node->cnode);
-        free(node);
-    }
-}
-
-etcd_response *etcd_response_create(void)
-{
-    etcd_response *resp = malloc(sizeof(etcd_response));
-    etcd_response_init(resp);
-    return resp;
-}
-
-static inline void etcd_response_init(etcd_response *resp)
-{
-    resp->ccode = CURLE_OK;
-    resp->hcode = -1;
-    resp->errcode = HIETCD_OK;
-    resp->errmsg[0] = '\0';
-    resp->cluster[0] = '\0';
-    resp->idx = -1;
-    resp->ridx = -1;
-    resp->rterm = -1;
-    resp->data[0] = '\0';
-    resp->action[0] = '\0';
-    resp->node = NULL;
-    resp->pnode = NULL;
-}
-
-void etcd_response_cleanup(etcd_response *resp)
-{
-    if (resp->node) 
-        etcd_node_destroy(resp->node);
-
-    if (resp->pnode)
-        etcd_node_destroy(resp->pnode);
-
-    etcd_response_init(resp);
-}
-
-void etcd_response_destroy(etcd_response *resp)
-{
-    etcd_response_cleanup(resp);
-    free(resp);
-}
+static int etcd_set_nonblock(int fd);
+static int etcd_fmt_url(etcd_client *client, const char *key, char *url);
+static int etcd_notify_io_thread(etcd_client *client);
+static int etcd_send_queue(etcd_client *client, etcd_request *req);
 
 etcd_client *etcd_client_create(void)
 {
@@ -143,16 +65,19 @@ etcd_client *etcd_client_create(void)
 
 void etcd_client_destroy(etcd_client *client)
 {
+    etcd_stop_io_thread(client);
     while (--client->snum >= 0)
         free(client->servers[client->snum]);
+    close(client->wfd);
     free(client); 
 }
 
 int etcd_start_io_thread(etcd_client *client)
 {
+    etcd_io *io;
+
     if (client->io != NULL) return HIETCD_OK;
 
-    etcd_io *io;
     if ((io = etcd_io_create()) == NULL) {
         ETCD_LOG_ERROR("Out of memory");
         return HIETCD_ERR;
@@ -162,11 +87,11 @@ int etcd_start_io_thread(etcd_client *client)
 
     if (pipe(fds) == -1) {
         free(io); 
-        ETCD_LOG_ERROR("Can't make a pipe %d",errno);
+        ETCD_LOG_ERROR("Can't make a pipe %d", errno);
         return HIETCD_ERR;
     }
-    set_nonblock(fds[0]);
-    set_nonblock(fds[1]);
+    etcd_set_nonblock(fds[0]);
+    etcd_set_nonblock(fds[1]);
 
     io->rfd = fds[0];
     io->elt.tv_sec = 3;
@@ -188,64 +113,58 @@ int etcd_start_io_thread(etcd_client *client)
 
 void etcd_stop_io_thread(etcd_client *client)
 {
-    etcd_io_stop(client->io);
-    notify_io_thread(client); 
-    pthread_join(client->tid, 0);
+    if (client->io != NULL) {
+        etcd_io_stop(client->io);
+        etcd_notify_io_thread(client); 
+        pthread_join(client->tid, 0);
+        etcd_io_destroy(client->io);
+        client->io = NULL;
+    }
 }
 
-static int notify_io_thread(etcd_client *client)
+static int etcd_notify_io_thread(etcd_client *client)
 {
     char c = 0;
     return write(client->wfd, &c, 1) == 1 ? HIETCD_OK : HIETCD_ERR;
 }
 
-static int set_nonblock(int fd)
+static int etcd_set_nonblock(int fd)
 {
     long l = fcntl(fd, F_GETFL);
     if(l & O_NONBLOCK) return 0;
     return fcntl(fd, F_SETFL, l | O_NONBLOCK);
 }
 
-/*
-
-static inline int etcd_async_send_request(etcd_client *client, etcd_request *req)
-{
-    if (!client->io) return HIETCD_ERR;
-    if (client->certfile) 
-        etcd_request_set_certfile(req, client->certfile);
-    etcd_hio_push_request(client->io, req); 
-    write(client->wfd, "0", 1);
-    return HIETCD_OK;
-}
-
-static char *etcd_get_server(etcd_client *client)
-{
-    return client->servers[0];
-}
-
-static int etcd_gen_url(etcd_client *client, const char *key, char *url) 
+static int etcd_fmt_url(etcd_client *client, const char *key, char *url) 
 {
     return snprintf(url, HIETCD_URL_BUFSIZE, "%s/%s/keys%s", 
-            etcd_get_server(client), HIETCD_SERVER_VERSION, key);
+            client->servers[0], HIETCD_SERVER_VERSION, key);
 }
 
-int etcd_amkdir(etcd_client *client, const char *key, size_t len, long long ttl)
+
+static int etcd_send_queue(etcd_client *client, etcd_request *req)
+{
+    etcd_io_push_request(client->io, req);
+    return etcd_notify_io_thread(client);
+}
+
+int etcd_amkdir(etcd_client *client, const char *key, size_t len, 
+        long long ttl)
 {
     int n;
     etcd_request *req;
-    char url[HIETCD_URL_BUFSIZE] = {0}, char data[9] = "dir=true"; 
+    char url[HIETCD_URL_BUFSIZE] = {0}; 
 
-    n = etcd_gen_url(client, key, url);
+    n = etcd_fmt_url(client, key, url);
     if (ttl > 0) 
-        n += snprintf(url+n, HIETCD_URL_BUFSIZE-n, "?ttl=%llu", ttl);
+        n += snprintf(url + n, HIETCD_URL_BUFSIZE - n, "?ttl=%llu", ttl);
 
-    req = etcd_request_create(url, n, HIETCD_REQUEST_PUT);
-    if (req == NULL) return HIETCD_ERR;
-    etcd_request_set_data(req, data, sizeof(data));
+    if ((req = etcd_request_create(url, n, ETCD_REQUEST_PUT)) == NULL)
+        return HIETCD_ERR;
 
-    return etcd_async_send_request(client, req);
+    etcd_request_set_data(req, "dir=true", 8);
+    return etcd_send_queue(client, req);
 }
-*/
 
 /*
 int etcd_add_server(etcd_client *client, const char *server, size_t len)
