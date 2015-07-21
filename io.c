@@ -150,7 +150,7 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
         goto io_dispatch_err;
     }
 
-    ETCD_LOG_DEBUG("curl_multi_add_handle: succ");
+    ETCD_LOG_DEBUG("curl_multi_add_handle: ok");
     return;
 
 io_dispatch_err:
@@ -190,7 +190,7 @@ static int etcd_io_sock_cb(CURL *ch, curl_socket_t fd, int action,
 
 static int etcd_io_multi_timer_cb(CURLM *cmh, long timeout_ms, etcd_io *io)
 {
-    ETCD_LOG_DEBUG("multi_timer_cb: timeout_ms %d", timeout_ms);
+    ETCD_LOG_DEBUG("multi_timer_cb: Setting timeout to %ld ms\n", timeout_ms);
     sev_del_timer(io->pool, io->tid);
     if (timeout_ms > 0) {
         io->tid = sev_add_timer(io->pool, timeout_ms, etcd_io_timer_cb, (void *)io); 
@@ -241,14 +241,14 @@ static void etcd_io_check_info(etcd_io *io)
     CURL *ch;
     CURLcode code;
     
-    ETCD_LOG_DEBUG("remainning running %d", io->running);
+    //ETCD_LOG_DEBUG("remainning running %d", io->running);
     while ((msg = curl_multi_info_read(io->cmh, &msgs_left))) {
         if (msg->msg == CURLMSG_DONE) {
             ch = msg->easy_handle;
             code = msg->data.result;
             curl_easy_getinfo(ch, CURLINFO_PRIVATE, &resp);
             curl_easy_getinfo(ch, CURLINFO_EFFECTIVE_URL, &eff_url);
-            ETCD_LOG_DEBUG("done: %s => (%d) %s", eff_url, code, resp->errmsg); 
+            ETCD_LOG_INFO("done, %s => (%d) %s", eff_url, code, resp->errmsg); 
             curl_multi_remove_handle(io->cmh, ch);
             curl_easy_cleanup(ch);
             etcd_response_destroy(resp);
@@ -276,9 +276,9 @@ void *etcd_io_start(void *args)
     pthread_mutex_unlock(&io->lock);
 
     // dispatch
-    ETCD_LOG_DEBUG("Started IO thread");
+    ETCD_LOG_INFO("Started IO thread");
     sev_dispatch(io->pool, &io->elt);
-    ETCD_LOG_DEBUG("IO thread terminated");
+    ETCD_LOG_INFO("IO thread terminated");
     return NULL;
 }
 
