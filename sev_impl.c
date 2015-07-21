@@ -200,7 +200,7 @@ static int sev_impl_poll(sev_pool *pool, struct timeval *tvp)
     memcpy(&impl->_rset, &impl->rset, sizeof(fd_set));
     memcpy(&impl->_wset, &impl->wset, sizeof(fd_set));
 
-    if (select(pool->maxfd+1, &impl->_rset, &impl->_wset, NULL, &tv) > 0) {
+    if (select(pool->maxfd+1, &impl->_rset, &impl->_wset, NULL, tp) > 0) {
         for (fd = 0; fd <= pool->maxfd; fd++, num++) {
             int flgs = 0;
             sev_file_event *event = &pool->events[fd];  
