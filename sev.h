@@ -54,7 +54,7 @@ struct sev_pool;
 /* Event handlers */
 typedef void sev_file_proc(struct sev_pool *pool, int fd, void *data, int flgs);
 typedef void sev_cron_proc(struct sev_pool *pool);
-typedef int sev_timer_proc(struct sev_pool *pool, long long id, void *data);
+typedef void sev_timer_proc(struct sev_pool *pool, long long id, void *data);
 
 /* File event */
 typedef struct {
@@ -83,14 +83,14 @@ typedef struct sev_pool {
     int done;
     int size;
     int maxfd;
+    long tnum; /* number of timers */
+    long tmaxnum;
+    long long tmaxid; /* max timer id */
+    sev_timer **timers;
     void *impl; /* Polling implementation */
     sev_file_event *events;
     sev_ready_event *ready;
     sev_cron_proc *cron; 
-    sev_timer **timers;
-    long tnum; /* number of timers */
-    long tmaxnum;
-    long long tmaxid; /* max timer id */
 } sev_pool;
 
 sev_pool *sev_pool_create(int size);

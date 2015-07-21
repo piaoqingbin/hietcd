@@ -94,9 +94,9 @@ int etcd_start_io_thread(etcd_client *client)
     etcd_set_nonblock(fds[1]);
 
     io->rfd = fds[0];
-    io->elt.tv_sec = 3;
-    io->elt.tv_usec = 0;
-    io->size = 1024;
+    io->elt.tv_sec = 0;
+    io->elt.tv_usec = 1000;
+    io->size = 10240;
 
     ETCD_LOG_DEBUG("Starting IO thread...");
     pthread_create(&client->tid, 0, etcd_io_start, (void *)io);

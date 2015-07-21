@@ -43,6 +43,8 @@ typedef struct etcd_io {
     int ready;
     int rfd; /* Readable pipe fd */
     int size; /* Event pool size */
+    int running; /* Still running */
+    long long tid; /* Timer id */
     sev_pool *pool; /* Event pool */
     struct timeval elt; /* Event loop timeout */
     CURLM *cmh; /* CURL mutil handler */
@@ -53,6 +55,13 @@ typedef struct etcd_io {
     pthread_cond_t cond;
     pthread_mutex_t lock;
 } etcd_io;
+
+/* Etcd socket info structure */
+typedef struct etcd_io_sock {
+    int action;
+    curl_socket_t fd;
+    CURL *ch;
+} etcd_io_sock;
 
 etcd_io *etcd_io_create(void);
 void etcd_io_destroy(etcd_io *io);

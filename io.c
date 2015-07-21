@@ -44,7 +44,10 @@ static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs);
 static void etcd_io_dispatch(etcd_io *io, etcd_request *req);
 static int etcd_io_sock_cb(CURL *ch, curl_socket_t s, int what, 
         void *cbp, void *sockp);
-static int etcd_io_timer_cb(CURLM *cmh, long timeout_ms, etcd_io *io);
+static int etcd_io_multi_timer_cb(CURLM *cmh, long timeout_ms, etcd_io *io);
+static void etcd_io_timer_cb(sev_pool *pool, long long id, void *data);
+static void etcd_io_event_cb(sev_pool *pool, int fd, void *data, int flgs);
+static void etcd_io_check_info(etcd_io *io);
 
 etcd_io *etcd_io_create(void)
 {
@@ -56,6 +59,8 @@ etcd_io *etcd_io_create(void)
     io->ready = 0;
     io->rfd = -1;
     io->size = -1;
+    io->running = 0;
+    io->tid = -1;
     io->pool = NULL;
     io->cmh = NULL;
     memset(&io->elt, 0, sizeof(struct timeval));
@@ -99,7 +104,7 @@ static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs)
 
 static void etcd_io_cron(sev_pool *pool) 
 {
-    ETCD_LOG_DEBUG("running ...");
+    //ETCD_LOG_DEBUG("running ...");
 }
 
 static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
@@ -133,8 +138,8 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
     curl_easy_setopt(ch, CURLOPT_CUSTOMREQUEST, req->method);
     curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, etcd_response_write_cb);
     curl_easy_setopt(ch, CURLOPT_WRITEDATA, resp->data);
-    //curl_easy_setopt(ch, CURLOPT_ERRORBUFFER, resp->errmsg);
-    //curl_easy_setopt(conn->easy, CURLOPT_PRIVATE, conn);
+    curl_easy_setopt(ch, CURLOPT_ERRORBUFFER, resp->errmsg);
+    curl_easy_setopt(ch, CURLOPT_PRIVATE, resp);
     //curl_easy_setopt(conn->easy, CURLOPT_NOPROGRESS, 0L);
     //curl_easy_setopt(conn->easy, CURLOPT_PROGRESSFUNCTION, prog_cb);
     //curl_easy_setopt(conn->easy, CURLOPT_PROGRESSDATA, conn);
@@ -152,28 +157,103 @@ io_dispatch_err:
     etcd_response_destroy(resp);
 }
 
-static int etcd_io_sock_cb(CURL *ch, curl_socket_t s, int what, 
+static int etcd_io_sock_cb(CURL *ch, curl_socket_t fd, int action, 
     void *cbp, void *sockp)
 {
     etcd_io *io = (etcd_io *) cbp; 
+    etcd_io_sock *sock = (etcd_io_sock *) sockp;
+    static const char *actstr[]={ "none", "IN", "OUT", "INOUT", "REMOVE"};
+    int flgs = (action&CURL_POLL_IN?SEV_R:0)|(action&CURL_POLL_OUT?SEV_W:0);
 
-    ETCD_LOG_DEBUG("what: %d", what);
+    ETCD_LOG_DEBUG("fd=%d, ch=%p, action=%s", fd, ch, actstr[action]);
+
+    if (action == CURL_POLL_REMOVE) {
+        sev_del_event(io->pool, fd, flgs);
+        if (sock) free(sock); 
+    } else if (!sock) {
+        ETCD_LOG_DEBUG("Adding data %s", actstr[action]); 
+        sock = calloc(sizeof(etcd_io_sock), 1);
+        sock->fd = fd;
+        sock->action = action;
+        sock->ch = ch;
+        sev_add_event(io->pool, fd, flgs, etcd_io_event_cb, io);
+        curl_multi_assign(io->cmh, fd, sock); 
+    } else {
+        ETCD_LOG_DEBUG("Changing action from %s to %s", actstr[sock->action], actstr[action]);
+        sock->fd = fd;
+        sock->action = action;
+        sock->ch = ch;
+        sev_add_event(io->pool, fd, flgs, etcd_io_event_cb, io);
+    }
     return 0;
 }
 
-static int etcd_io_timer_cb(CURLM *cmh, long timeout_ms, etcd_io *io)
+static int etcd_io_multi_timer_cb(CURLM *cmh, long timeout_ms, etcd_io *io)
 {
-    /*
-    struct timeval timeout;
-    (void)multi;
- 
-    timeout.tv_sec = timeout_ms/1000;
-    timeout.tv_usec = (timeout_ms%1000)*1000;
-    fprintf(MSG_OUT, "multi_timer_cb: Setting timeout to %ld ms\n", timeout_ms);
-    evtimer_add(g->timer_event, &timeout);
-    */
-    ETCD_LOG_DEBUG("timeout_ms: %d", timeout_ms);
+    ETCD_LOG_DEBUG("multi_timer_cb: timeout_ms %d", timeout_ms);
+    sev_del_timer(io->pool, io->tid);
+    if (timeout_ms > 0) {
+        io->tid = sev_add_timer(io->pool, timeout_ms, etcd_io_timer_cb, (void *)io); 
+        sev_add_timer(io->pool, timeout_ms, etcd_io_timer_cb, (void *)io); 
+    } else {
+        etcd_io_timer_cb(io->pool, -1, io); 
+    }
     return 0;
+}
+
+static void etcd_io_timer_cb(struct sev_pool *pool, long long id, void *data)
+{
+    CURLMcode code;
+    etcd_io *io = (etcd_io *) data; 
+
+    code = curl_multi_socket_action(io->cmh, CURL_SOCKET_TIMEOUT, 0, &io->running);
+    if (code != CURLM_OK) {
+        ETCD_LOG_ERROR("curl_multi_socket_action: %d", code);
+        return;
+    }
+    etcd_io_check_info(io);
+}
+
+static void etcd_io_event_cb(sev_pool *pool, int fd, void *data, int flgs)
+{
+    CURLMcode code;
+    etcd_io *io = (etcd_io *) data;
+    int action = (flgs&SEV_R?CURL_POLL_IN:0)|(flgs&SEV_W?CURL_POLL_OUT:0);
+    
+    code = curl_multi_socket_action(io->cmh, fd, action, &io->running);
+    if (code != CURLM_OK) {
+        ETCD_LOG_ERROR("curl_multi_socket_action: %d", code);
+        return;
+    }
+    etcd_io_check_info(io);
+    if (io->running <= 0) {
+        ETCD_LOG_DEBUG("last transfer done, kill timeout\n");
+        sev_del_timer(io->pool, io->tid);
+    }
+}
+
+static void etcd_io_check_info(etcd_io *io)
+{
+    char *eff_url;
+    CURLMsg *msg;
+    int msgs_left;
+    etcd_response *resp;
+    CURL *ch;
+    CURLcode code;
+    
+    ETCD_LOG_DEBUG("remainning running %d", io->running);
+    while ((msg = curl_multi_info_read(io->cmh, &msgs_left))) {
+        if (msg->msg == CURLMSG_DONE) {
+            ch = msg->easy_handle;
+            code = msg->data.result;
+            curl_easy_getinfo(ch, CURLINFO_PRIVATE, &resp);
+            curl_easy_getinfo(ch, CURLINFO_EFFECTIVE_URL, &eff_url);
+            ETCD_LOG_DEBUG("done: %s => (%d) %s", eff_url, code, resp->errmsg); 
+            curl_multi_remove_handle(io->cmh, ch);
+            curl_easy_cleanup(ch);
+            etcd_response_destroy(resp);
+        }
+    }
 }
 
 void *etcd_io_start(void *args)
@@ -186,7 +266,7 @@ void *etcd_io_start(void *args)
     io->cmh = curl_multi_init();
     curl_multi_setopt(io->cmh, CURLMOPT_SOCKETFUNCTION, etcd_io_sock_cb);
     curl_multi_setopt(io->cmh, CURLMOPT_SOCKETDATA, io);
-    curl_multi_setopt(io->cmh, CURLMOPT_TIMERFUNCTION, etcd_io_timer_cb);
+    curl_multi_setopt(io->cmh, CURLMOPT_TIMERFUNCTION, etcd_io_multi_timer_cb);
     curl_multi_setopt(io->cmh, CURLMOPT_TIMERDATA, io);
     
     // notify
