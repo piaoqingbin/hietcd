@@ -241,7 +241,6 @@ static void etcd_io_check_info(etcd_io *io)
     CURL *ch;
     CURLcode code;
     
-    //ETCD_LOG_DEBUG("remainning running %d", io->running);
     while ((msg = curl_multi_info_read(io->cmh, &msgs_left))) {
         if (msg->msg == CURLMSG_DONE) {
             ch = msg->easy_handle;
@@ -249,6 +248,7 @@ static void etcd_io_check_info(etcd_io *io)
             curl_easy_getinfo(ch, CURLINFO_PRIVATE, &resp);
             curl_easy_getinfo(ch, CURLINFO_EFFECTIVE_URL, &eff_url);
             ETCD_LOG_INFO("done, %s => (%d) %s", eff_url, code, resp->errmsg); 
+            ETCD_LOG_DEBUG("remainning running %d", io->running);
             curl_multi_remove_handle(io->cmh, ch);
             curl_easy_cleanup(ch);
             etcd_response_destroy(resp);
