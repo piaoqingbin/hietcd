@@ -136,6 +136,7 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
     curl_easy_setopt(ch, CURLOPT_TIMEOUT, io->client->timeout);
     curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, io->client->conntimeout);
     curl_easy_setopt(ch, CURLOPT_TCP_KEEPALIVE, io->client->keepalive);
+    curl_easy_setopt(ch, CURLOPT_NOPROGRESS, 1L);
 
     curl_easy_setopt(ch, CURLOPT_URL, req->url);
     curl_easy_setopt(ch, CURLOPT_CUSTOMREQUEST, req->method);
@@ -145,7 +146,11 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
     curl_easy_setopt(ch, CURLOPT_WRITEDATA, resp->data);
     curl_easy_setopt(ch, CURLOPT_ERRORBUFFER, resp->errmsg);
     curl_easy_setopt(ch, CURLOPT_PRIVATE, resp);
-    curl_easy_setopt(ch, CURLOPT_NOPROGRESS, 1L);
+
+    if (req->data) {
+        curl_easy_setopt(ch, CURLOPT_POST, 1L);
+        curl_easy_setopt(ch, CURLOPT_POSTFIELDS, req->data);
+    }
 
     code = curl_multi_add_handle(io->cmh, ch);
     if (code != CURLM_OK) {
