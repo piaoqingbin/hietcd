@@ -301,7 +301,6 @@ int sev_process_timer(sev_pool *pool)
         if ((sec == tm->sec && msec < tm->msec) || sec < tm->sec)
             break;
 
-        //fprintf(stderr, "now:%ld, %ld | tm:%lld, %ld, %ld\n", sec, msec, tm->id, tm->sec, tm->msec);
         if (tm->proc != NULL) tm->proc(pool, tm->id, tm->data);
         sev_del_timer(pool, tm->id);
         num++;
