@@ -59,6 +59,8 @@ etcd_client *etcd_client_create(void)
     client->snum = 0;
     client->certfile = NULL;
     client->io = NULL;
+    client->proc = NULL;
+    client->userdata = NULL;
 
     return client;
 }
@@ -72,6 +74,12 @@ void etcd_client_destroy(etcd_client *client)
     free(client); 
 }
 
+void etcd_set_response_proc(etcd_client *client, etcd_response_proc *proc, void *userdata)
+{
+    client->proc = proc;
+    client->userdata = userdata;
+}
+
 int etcd_start_io_thread(etcd_client *client)
 {
     etcd_io *io;
@@ -82,6 +90,7 @@ int etcd_start_io_thread(etcd_client *client)
         ETCD_LOG_ERROR("Out of memory");
         return HIETCD_ERR;
     }
+    io->client = client;
 
     int fds[2] = {0};
 

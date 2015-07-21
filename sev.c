@@ -51,8 +51,8 @@ sev_pool *sev_pool_create(int size)
 
     if ((pool = malloc(sizeof(sev_pool))) == NULL) 
         goto create_err; 
-    pool->events = malloc(sizeof(sev_file_event) * size);
-    pool->ready = malloc(sizeof(sev_ready_event) * size);
+    pool->events = calloc(size, sizeof(sev_file_event));
+    pool->ready = calloc(size, sizeof(sev_ready_event));
     if (pool->events == NULL || pool->ready == NULL) 
         goto create_err;
     pool->size = size;
@@ -61,15 +61,13 @@ sev_pool *sev_pool_create(int size)
     pool->cron = NULL;
     if (sev_impl_create(pool) != SEV_OK)
         goto create_err;
-    memset((void *)pool->events, 0, sizeof(sev_file_event) * size);
 
     pool->tmaxid = 0;
     pool->tnum = 0;
     pool->tmaxnum = SEV_TIMER_DEFAULT_SIZE;
-    if ((timers = malloc(sizeof(sev_timer*) * pool->tmaxnum)) == NULL)
+    if ((timers = calloc(pool->tmaxnum, sizeof(sev_timer*))) == NULL)
         goto create_err;
 
-    memset((void *)timers, 0, sizeof(sev_timer*) * pool->tmaxnum);
     pool->timers = timers;
 
     return pool;

@@ -34,6 +34,7 @@
 #include <curl/curl.h>
 
 #include "io.h"
+#include "response.h"
 
 #define HIETCD_OK 0
 #define HIETCD_ERR -1
@@ -50,21 +51,29 @@
 
 #define HIETCD_URL_BUFSIZE 512
 
+typedef struct etcd_client etcd_client;
+
+/* Response process function */
+typedef void etcd_response_proc(etcd_client *client, etcd_response *resp, void *userdata);
+
 /* Etcd client structure */
-typedef struct etcd_client {
+struct etcd_client {
     short timeout;
     short conntimeout;
     short keepalive;
     short snum; /* number of servers */
+    int wfd; /* writable pipe fd */
+    pthread_t tid; /* thread id */
     char *certfile;
     char *servers[HIETCD_MAX_NODE_NUM];
-    int wfd; /* Writable pipe fd */
-    etcd_io *io; /* io thread */
-    pthread_t tid; /* thread id */
-} etcd_client;
+    struct etcd_io *io; /* io thread */
+    etcd_response_proc *proc;
+    void *userdata;
+};
 
 etcd_client *etcd_client_create(void);
 void etcd_client_destroy(etcd_client *client);
+void etcd_set_response_proc(etcd_client *client, etcd_response_proc *proc, void *userdata);
 
 int etcd_start_io_thread(etcd_client *client);
 void etcd_stop_io_thread(etcd_client *client);

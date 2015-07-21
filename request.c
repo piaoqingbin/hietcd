@@ -42,7 +42,6 @@ etcd_request *etcd_request_create(char *url, size_t len, const char *method)
 
     req->url = strndup(url, len);
     req->method = method;
-    req->certfile = NULL;
     req->data = NULL;
     etcd_rq_init(&req->rq);
 

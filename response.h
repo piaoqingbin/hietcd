@@ -81,7 +81,7 @@ typedef struct {
     long long rterm; /* raft term */
     /* response data */
     char data[ETCD_DATA_BUFSIZE];
-    char action[16];
+    char action[8];
     etcd_node *node;
     etcd_node *pnode; /* prev node */
 } etcd_response;

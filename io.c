@@ -39,6 +39,8 @@
 #include "request.h"
 #include "response.h"
 
+static const char *actstr[] = {"none", "IN", "OUT", "INOUT", "REMOVE"};
+
 static void etcd_io_cron(sev_pool *pool); 
 static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs);
 static void etcd_io_dispatch(etcd_io *io, etcd_request *req);
@@ -47,6 +49,7 @@ static int etcd_io_sock_cb(CURL *ch, curl_socket_t s, int what,
 static int etcd_io_multi_timer_cb(CURLM *cmh, long timeout_ms, etcd_io *io);
 static void etcd_io_timer_cb(sev_pool *pool, long long id, void *data);
 static void etcd_io_event_cb(sev_pool *pool, int fd, void *data, int flgs);
+static void etcd_io_response_cb(etcd_io *io, etcd_response *resp);
 static void etcd_io_check_info(etcd_io *io);
 
 etcd_io *etcd_io_create(void)
@@ -63,7 +66,8 @@ etcd_io *etcd_io_create(void)
     io->tid = -1;
     io->pool = NULL;
     io->cmh = NULL;
-    memset(&io->elt, 0, sizeof(struct timeval));
+    io->elt.tv_sec = 0;
+    io->elt.tv_usec = 0;
     etcd_rq_init(&io->rq);
     pthread_mutex_init(&io->rqlock, NULL);
 
@@ -109,8 +113,8 @@ static void etcd_io_cron(sev_pool *pool)
 
 static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
 {
-    CURLMcode code;
     CURL *ch;
+    CURLMcode code;
     etcd_response *resp;
 
     if ((resp = etcd_response_create()) == NULL) {
@@ -124,15 +128,15 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
         goto io_dispatch_err;
     }
 
-    curl_easy_setopt(ch, CURLOPT_VERBOSE, 1L);
+    //curl_easy_setopt(ch, CURLOPT_VERBOSE, 1L);
     curl_easy_setopt(ch, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(ch, CURLOPT_FORBID_REUSE, 1);
     curl_easy_setopt(ch, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(ch, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
-    /*
-    curl_easy_setopt(ch, CURLOPT_TIMEOUT, 3);
-    curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, 3);
-    */
+    curl_easy_setopt(ch, CURLOPT_TIMEOUT, io->client->timeout);
+    curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, io->client->conntimeout);
+    curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, io->client->conntimeout);
+    curl_easy_setopt(ch, CURLOPT_TCP_KEEPALIVE, io->client->keepalive);
 
     curl_easy_setopt(ch, CURLOPT_URL, req->url);
     curl_easy_setopt(ch, CURLOPT_CUSTOMREQUEST, req->method);
@@ -142,9 +146,7 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
     curl_easy_setopt(ch, CURLOPT_WRITEDATA, resp->data);
     curl_easy_setopt(ch, CURLOPT_ERRORBUFFER, resp->errmsg);
     curl_easy_setopt(ch, CURLOPT_PRIVATE, resp);
-    //curl_easy_setopt(conn->easy, CURLOPT_NOPROGRESS, 0L);
-    //curl_easy_setopt(conn->easy, CURLOPT_PROGRESSFUNCTION, prog_cb);
-    //curl_easy_setopt(conn->easy, CURLOPT_PROGRESSDATA, conn);
+    curl_easy_setopt(ch, CURLOPT_NOPROGRESS, 1L);
 
     code = curl_multi_add_handle(io->cmh, ch);
     if (code != CURLM_OK) {
@@ -234,6 +236,15 @@ static void etcd_io_event_cb(sev_pool *pool, int fd, void *data, int flgs)
     }
 }
 
+static void etcd_io_response_cb(etcd_io *io, etcd_response *resp)
+{
+    etcd_client *client = io->client;
+
+    if (client->proc != NULL) {
+        client->proc(client, resp, client->userdata); 
+    }
+}
+
 static void etcd_io_check_info(etcd_io *io)
 {
     char *eff_url;
@@ -251,9 +262,15 @@ static void etcd_io_check_info(etcd_io *io)
             curl_easy_getinfo(ch, CURLINFO_EFFECTIVE_URL, &eff_url);
             ETCD_LOG_INFO("done, %s => (%d) %s", eff_url, code, resp->errmsg); 
             ETCD_LOG_DEBUG("remainning running %d", io->running);
+            if ((resp->ccode = code) == CURLE_OK) {
+                curl_easy_getinfo(ch, CURLINFO_RESPONSE_CODE, &resp->hcode);
+                etcd_response_parse(resp); 
+            } else {
+                resp->errcode = ETCD_ERR_CURL;
+            }
             curl_multi_remove_handle(io->cmh, ch);
             curl_easy_cleanup(ch);
-            fprintf(stderr, "ret:%d\n", etcd_response_parse(resp));
+            etcd_io_response_cb(io, resp);                 
             etcd_response_destroy(resp);
         }
     }

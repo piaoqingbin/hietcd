@@ -37,16 +37,20 @@
 
 #include "sev.h"
 #include "request.h"
+#include "hietcd.h"
+
+typedef struct etcd_io etcd_io;
 
 /* Etcd http io structure */
-typedef struct etcd_io {
+struct etcd_io {
     int ready;
     int rfd; /* Readable pipe fd */
     int size; /* Event pool size */
     int running; /* Still running */
     long long tid; /* Timer id */
-    sev_pool *pool; /* Event pool */
     struct timeval elt; /* Event loop timeout */
+    sev_pool *pool; /* Event pool */
+    struct etcd_client *client; /* Global config */
     CURLM *cmh; /* CURL mutil handler */
     /* Request queue */
     etcd_rq rq;
@@ -54,7 +58,7 @@ typedef struct etcd_io {
     /* cond&lock */
     pthread_cond_t cond;
     pthread_mutex_t lock;
-} etcd_io;
+};
 
 /* Etcd socket info structure */
 typedef struct etcd_io_sock {

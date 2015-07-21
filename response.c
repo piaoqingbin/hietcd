@@ -36,6 +36,11 @@
 #include "hietcd.h"
 #include "response.h"
 
+/* Parse flags */
+#define PF_NULL     0
+#define PF_LONG     1
+#define PF_STRCPY   2
+
 typedef enum {
     ETCD_RESP_KEY_ERRCODE = 0,
     ETCD_RESP_KEY_MESSAGE,
@@ -79,7 +84,7 @@ static yajl_type etcd_resp_key_type[] = {
     yajl_t_string,
     yajl_t_number,
     yajl_t_number,
-    yajl_t_any,
+    yajl_t_number,
     yajl_t_string,
     yajl_t_object,
     yajl_t_array
@@ -88,7 +93,7 @@ static yajl_type etcd_resp_key_type[] = {
 static inline void etcd_response_init(etcd_response *resp);
 static int etcd_response_parse_err(etcd_response *resp, yajl_val obj);
 static etcd_node *etcd_response_parse_node(yajl_val obj, int parse_child);
-static int etcd_response_parse_key(yajl_val obj, etcd_resp_key, void *data);
+static int etcd_response_parse_key(yajl_val obj, etcd_resp_key, void *data, int flgs);
 
 etcd_node *etcd_node_create(void)
 {
@@ -97,13 +102,13 @@ etcd_node *etcd_node_create(void)
     if (!(node = malloc(sizeof(etcd_node))))
         return NULL;
 
-    node->key = NULL;
-    node->value = NULL;
     node->isdir = 0;
     node->ttl = -1;
-    node->expr[0] = '\0';
     node->cidx = -1;
     node->midx = -1;
+    node->expr[0] = '\0';
+    node->key = NULL;
+    node->value = NULL;
     node->snode = NULL;
     node->cnode = NULL;
     node->ccount = 0;
@@ -139,7 +144,7 @@ static inline void etcd_response_init(etcd_response *resp)
 {
     resp->ccode = CURLE_OK;
     resp->hcode = -1;
-    resp->errcode = HIETCD_OK;
+    resp->errcode = ETCD_OK;
     resp->errmsg[0] = '\0';
     resp->cluster[0] = '\0';
     resp->idx = -1;
@@ -178,17 +183,17 @@ size_t etcd_response_header_cb(char *buffer, size_t size, size_t nitems,
     if (!resp) goto response_header_cb_done;
 
     if (strstr(p, ETCD_HEADER_ECID) == p) {
-//        n = sizeof(ETCD_HEADER_ECID);
-//        resp->cluster_id = strndup(p + n + 1, nitems - n - 2);
+        n = sizeof(ETCD_HEADER_ECID);
+        strncpy(resp->cluster, p + n + 1, nitems - n - 2);
     } else if (strstr(p, ETCD_HEADER_EIDX) == p) {
-//        n = sizeof(ETCD_HEADER_EIDX);
-//        resp->etcd_index = atoi(p + n + 1);
+        n = sizeof(ETCD_HEADER_EIDX);
+        resp->idx = atoll(p + n + 1);
     } else if (strstr(p, ETCD_HEADER_RIDX) == p) {
-//        n = sizeof(ETCD_HEADER_RIDX);
-//        resp->raft_index = atoi(p + n + 1);
+        n = sizeof(ETCD_HEADER_RIDX);
+        resp->ridx = atoll(p + n + 1);
     } else if (strstr(p, ETCD_HEADER_RTERM) == p) {
-//        n = sizeof(ETCD_HEADER_RTERM);
-//        resp->raft_term = atoi(p + n + 1);
+        n = sizeof(ETCD_HEADER_RTERM);
+        resp->rterm = atoll(p + n + 1);
     }
 
 response_header_cb_done:
@@ -217,12 +222,12 @@ int etcd_response_parse(etcd_response *resp)
     if (etcd_response_parse_err(resp, obj) == ETCD_OK)
         goto response_parse_done;
     
-    etcd_response_parse_key(obj, ETCD_RESP_KEY_ACTION, &resp->action);
+    etcd_response_parse_key(obj, ETCD_RESP_KEY_ACTION, &resp->action, PF_STRCPY);
 
     // node
-    if (etcd_response_parse_key(obj, ETCD_RESP_KEY_NODE, &val) == ETCD_OK)
+    if (etcd_response_parse_key(obj, ETCD_RESP_KEY_NODE, &val, PF_NULL) == ETCD_OK)
         resp->node = etcd_response_parse_node(val, 1); 
-    if (etcd_response_parse_key(obj, ETCD_RESP_KEY_PNODE, &val) == ETCD_OK)
+    if (etcd_response_parse_key(obj, ETCD_RESP_KEY_PNODE, &val, PF_NULL) == ETCD_OK)
         resp->pnode = etcd_response_parse_node(val, 1); 
 
     resp->errcode = ETCD_OK;
@@ -235,9 +240,9 @@ response_parse_done:
 static int etcd_response_parse_err(etcd_response *resp, yajl_val obj)
 {
     int ret;
-    ret = etcd_response_parse_key(obj, ETCD_RESP_KEY_ERRCODE, &resp->errcode);
+    ret = etcd_response_parse_key(obj, ETCD_RESP_KEY_ERRCODE, &resp->errcode, PF_NULL);
     if (ret != ETCD_OK) return ret;
-    ret = etcd_response_parse_key(obj, ETCD_RESP_KEY_MESSAGE, &resp->errmsg);
+    ret = etcd_response_parse_key(obj, ETCD_RESP_KEY_MESSAGE, &resp->errmsg, PF_STRCPY);
     return ret;
 }
 
@@ -249,15 +254,15 @@ static etcd_node *etcd_response_parse_node(yajl_val obj, int parse_child)
     if ((node = etcd_node_create()) == NULL)
         return NULL;
 
-    etcd_response_parse_key(obj, ETCD_RESP_KEY_KEY, &node->key);
-    etcd_response_parse_key(obj, ETCD_RESP_KEY_VALUE, &node->value);
-    etcd_response_parse_key(obj, ETCD_RESP_KEY_DIR, &node->isdir);
-    etcd_response_parse_key(obj, ETCD_RESP_KEY_CIDX, &node->cidx);
-    etcd_response_parse_key(obj, ETCD_RESP_KEY_MIDX, &node->midx);
-    etcd_response_parse_key(obj, ETCD_RESP_KEY_TTL, &node->ttl);
-    etcd_response_parse_key(obj, ETCD_RESP_KEY_EXPR, &node->expr);
+    etcd_response_parse_key(obj, ETCD_RESP_KEY_KEY, &node->key, PF_NULL);
+    etcd_response_parse_key(obj, ETCD_RESP_KEY_VALUE, &node->value, PF_NULL);
+    etcd_response_parse_key(obj, ETCD_RESP_KEY_DIR, &node->isdir, PF_NULL);
+    etcd_response_parse_key(obj, ETCD_RESP_KEY_CIDX, &node->cidx, PF_LONG);
+    etcd_response_parse_key(obj, ETCD_RESP_KEY_MIDX, &node->midx, PF_LONG);
+    etcd_response_parse_key(obj, ETCD_RESP_KEY_TTL, &node->ttl, PF_NULL);
+    etcd_response_parse_key(obj, ETCD_RESP_KEY_EXPR, &node->expr, PF_STRCPY);
 
-    if (etcd_response_parse_key(obj, ETCD_RESP_KEY_NODES, &val) == ETCD_OK) {
+    if (etcd_response_parse_key(obj, ETCD_RESP_KEY_NODES, &val, PF_NULL) == ETCD_OK) {
 
         node->ccount = val->u.array.len;
         if (parse_child) {
@@ -277,16 +282,10 @@ static etcd_node *etcd_response_parse_node(yajl_val obj, int parse_child)
     return node;
 }
 
-static int etcd_response_parse_key(yajl_val obj, etcd_resp_key k, void *data)
+static int etcd_response_parse_key(yajl_val obj, etcd_resp_key k, void *data, int flgs)
 {
     yajl_val val;
     yajl_type t = etcd_resp_key_type[k];
-    int llnum = 1;
-
-    if (t == yajl_t_any) {
-        t = yajl_t_number;
-        llnum = 0;
-    }
 
     val = yajl_tree_get(obj, etcd_resp_key_path[k], t);
     if (!val) return ETCD_ERR_PROTOCOL;
@@ -294,15 +293,23 @@ static int etcd_response_parse_key(yajl_val obj, etcd_resp_key k, void *data)
     switch (t) {
 
     case yajl_t_number:  
-        if (llnum == 1) {
-            *((long long *)data) = strtoll(YAJL_GET_NUMBER(val), NULL, 10);
-        } else { 
-            *((int *)data) = (int)strtol(YAJL_GET_NUMBER(val), NULL, 10);
+        if (YAJL_IS_NUMBER(val)) {
+            if (flgs & PF_LONG) {
+                *((long long *)data) = YAJL_GET_INTEGER(val);
+            } else { 
+                *((int *)data) = (int)YAJL_GET_INTEGER(val);
+            }
         }
         break;
 
     case yajl_t_string:
-        *((char **)data) = strdup(YAJL_GET_STRING(val));
+        if (YAJL_IS_STRING(val)) {
+            if (flgs & PF_STRCPY) {
+                strcpy((char *)data, YAJL_GET_STRING(val));
+            } else {
+                *((char **)data) = strdup(YAJL_GET_STRING(val));
+            }
+        }
         break;
 
     case yajl_t_object:
