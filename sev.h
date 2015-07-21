@@ -37,7 +37,7 @@
 #define SEV_R 1 /* Readable event flag */
 #define SEV_W 2 /* Writable event flag */
 
-#define SEV_TIMER_DEFAULT_SIZE (1<<7) /* 128, 1k */
+#define SEV_TIMER_DEFAULT_SIZE (1<<2) /* 128, 1k */
 #define SEV_TIMER_MAX_SIZE (1<<17) /* 131072, 1m */  
 
 #define SEV_TIMER_PARENT(i)     (((i)+1)/2-1)
@@ -54,7 +54,7 @@ struct sev_pool;
 /* Event handlers */
 typedef void sev_file_proc(struct sev_pool *pool, int fd, void *data, int flgs);
 typedef void sev_cron_proc(struct sev_pool *pool);
-typedef int sev_timer_proc(struct sev_pool *pool, void *data);
+typedef int sev_timer_proc(struct sev_pool *pool, long long id, void *data);
 
 /* File event */
 typedef struct {
@@ -71,9 +71,9 @@ typedef struct {
 
 /* Timer structure */
 typedef struct {
-    long long id; /* timer id */
     long sec;
     long msec;
+    long long id; /* timer id */
     sev_timer_proc *proc; 
     void *data;
 } sev_timer;
@@ -99,7 +99,8 @@ int sev_add_event(sev_pool *pool, int fd, int flgs, sev_file_proc *proc, void *d
 void sev_del_event(sev_pool *pool, int fd, int flgs);
 long long sev_add_timer(sev_pool *pool, long long timeout_ms, sev_timer_proc *proc, void *data);
 int sev_del_timer(sev_pool *pool, long long id);
-int sev_process(sev_pool *pool, struct timeval *tvp);
+int sev_process_timer(sev_pool *pool);
+int sev_process_event(sev_pool *pool, struct timeval *tvp);
 void sev_dispatch(sev_pool *pool, struct timeval *tvp);
 
 #endif

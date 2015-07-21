@@ -181,13 +181,10 @@ static int sev_timers_resize(sev_pool *pool, int flgs)
         if (tmaxnum < SEV_TIMER_DEFAULT_SIZE) return SEV_ERR;
     }
 
-    timers = malloc(sizeof(sev_timer*) * tmaxnum);
+    timers = realloc(pool->timers, sizeof(sev_timer*) * tmaxnum);
     if (timers == NULL) return SEV_ERR;
-    memset(timers, 0, sizeof(sev_timer*) * tmaxnum);
 
     pool->tmaxnum = tmaxnum;
-    memcpy(timers, pool->timers, sizeof(sev_timer*) * pool->tnum);
-    free(pool->timers);
     pool->timers = timers;
 
     return SEV_OK;
@@ -235,7 +232,6 @@ long long sev_add_timer(sev_pool *pool, long long timeout_ms,
     if ((timer = malloc(sizeof(sev_timer))) == NULL)
         return 0;
 
-    /* resize */
     if (pool->tnum >= pool->tmaxnum) {
         if (sev_timers_resize(pool, 1) != SEV_OK)
             return 0;
@@ -286,32 +282,54 @@ int sev_del_timer(sev_pool *pool, long long id)
         }
     }
 
-    if (pool->tnum <= (pool->tmaxnum >> 2)) {
+    if (pool->tnum <= (pool->tmaxnum >> 2))
         sev_timers_resize(pool, 0); 
-    }
 
     return SEV_OK;
 }
 
-int sev_process(sev_pool *pool, struct timeval *tvp)
+int sev_process_timer(sev_pool *pool)
+{
+    sev_timer *tm;
+    long sec, msec;
+    int num = 0;
+
+    while (pool->timers[0] != NULL) {
+        tm = pool->timers[0];
+        sev_time_now(&sec, &msec);
+
+        if ((sec == tm->sec && msec < tm->msec) || sec < tm->sec)
+            break;
+
+        //fprintf(stderr, "now:%ld, %ld | tm:%lld, %ld, %ld\n", sec, msec, tm->id, tm->sec, tm->msec);
+        if (tm->proc != NULL) tm->proc(pool, tm->id, tm->data);
+        sev_del_timer(pool, tm->id);
+        num++;
+    }
+    return num;
+}
+
+int sev_process_event(sev_pool *pool, struct timeval *tvp)
 {
     int i, num = 0;
 
-    num = sev_impl_poll(pool, tvp);
-    for (i = 0; i < num; i++) {
-        int read = 0;
-        sev_ready_event *ready = &pool->ready[i];
-        sev_file_event *event = &pool->events[ready->fd];
+    if (pool->maxfd != -1) {
+        num = sev_impl_poll(pool, tvp);
+        for (i = 0; i < num; i++) {
+            int read = 0;
+            sev_ready_event *ready = &pool->ready[i];
+            sev_file_event *event = &pool->events[ready->fd];
         
-        if (ready->flgs & event->flgs & SEV_R) {
-            read = 1;
-            event->read(pool, ready->fd, event->data, ready->flgs);
-        }
-        if (ready->flgs & event->flgs & SEV_W) {
-            if (!read || (event->read != event->write))
-                event->write(pool, ready->fd, event->data, ready->flgs);
-        }
-    } 
+            if (ready->flgs & event->flgs & SEV_R) {
+                read = 1;
+                event->read(pool, ready->fd, event->data, ready->flgs);
+            }
+            if (ready->flgs & event->flgs & SEV_W) {
+                if (!read || (event->read != event->write))
+                    event->write(pool, ready->fd, event->data, ready->flgs);
+            }
+        } 
+    }
     return num;
 }
 
@@ -320,6 +338,7 @@ void sev_dispatch(sev_pool *pool, struct timeval *tvp)
     pool->done = 0;
     while (!pool->done) {
         if (pool->cron) pool->cron(pool);
-        sev_process(pool, tvp);
+        sev_process_timer(pool);
+        sev_process_event(pool, tvp);
     }
 }
