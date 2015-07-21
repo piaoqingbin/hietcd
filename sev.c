@@ -37,10 +37,12 @@
 #include "sev_impl.c"
 
 static inline void sev_time_now(long *sec, long *msec);
-static void sev_time_add_now(long long time_ms, long *sec, long *msec);
+static void sev_time_add2now(long long time_ms, long *sec, long *msec);
 static int sev_timer_cmp(sev_timer *tm, sev_timer *ts);
 static inline void sev_timer_swap(sev_timer **tm, sev_timer **ts);
 static int sev_timers_resize(sev_pool *pool, int flgs);
+static void sev_timer_swap_up(sev_pool *pool, int i);
+static void sev_timer_swap_down(sev_pool *pool, int i);
 
 sev_pool *sev_pool_create(int size)
 {
@@ -130,7 +132,7 @@ static inline void sev_time_now(long *sec, long *msec)
     *msec = tv.tv_usec/1000;
 }
 
-static void sev_time_add_now(long long time_ms, long *sec, long *msec)
+static void sev_time_add2now(long long time_ms, long *sec, long *msec)
 {
     sev_time_now(sec, msec);
     *sec += time_ms / 1000;
@@ -174,19 +176,54 @@ static int sev_timers_resize(sev_pool *pool, int flgs)
         tmaxnum = pool->tmaxnum << 1;
         if (tmaxnum > SEV_TIMER_MAX_SIZE) return SEV_ERR;
 
-        timers = malloc(sizeof(sev_timer*) * tmaxnum);
-        if (timers == NULL) return SEV_ERR;
-        memset(timers, 0, sizeof(sev_timer*) * tmaxnum);
-
-        pool->tmaxnum = tmaxnum;
-        memcpy(timers, pool->timers, sizeof(sev_timer*) * pool->tnum);
-        free(pool->timers);
-        pool->timers = timers;
-
     } else {
-    
+        tmaxnum = pool->tmaxnum >> 1; 
+        if (tmaxnum < SEV_TIMER_DEFAULT_SIZE) return SEV_ERR;
     }
+
+    timers = malloc(sizeof(sev_timer*) * tmaxnum);
+    if (timers == NULL) return SEV_ERR;
+    memset(timers, 0, sizeof(sev_timer*) * tmaxnum);
+
+    pool->tmaxnum = tmaxnum;
+    memcpy(timers, pool->timers, sizeof(sev_timer*) * pool->tnum);
+    free(pool->timers);
+    pool->timers = timers;
+
     return SEV_OK;
+}
+
+static void sev_timer_swap_up(sev_pool *pool, int i)
+{
+    int j;
+
+    for (; i > 0; i = j) {
+        j = SEV_TIMER_PARENT(i);
+        if (sev_timer_cmp(pool->timers[i], pool->timers[j]) < 0)
+            sev_timer_swap(&pool->timers[i], &pool->timers[j]);
+    }
+}
+
+static void sev_timer_swap_down(sev_pool *pool, int i)
+{
+    int j;
+
+    for (;; i = j) {
+        j = SEV_TIMER_RIGHT(i);
+        if (j < pool->tnum) {
+            if (sev_timer_cmp(pool->timers[j-1], pool->timers[j]) < 0)    
+                j--;
+            if (sev_timer_cmp(pool->timers[i], pool->timers[j]) > 0)
+                sev_timer_swap(&pool->timers[i], &pool->timers[j]);
+        } else {
+            j = SEV_TIMER_LEFT(i); 
+            if (j < pool->tnum) {
+                if (sev_timer_cmp(pool->timers[i], pool->timers[j]) > 0)    
+                    sev_timer_swap(&pool->timers[i], &pool->timers[j]);
+            }
+            break;
+        }
+    }
 }
 
 long long sev_add_timer(sev_pool *pool, long long timeout_ms, 
@@ -198,6 +235,7 @@ long long sev_add_timer(sev_pool *pool, long long timeout_ms,
     if ((timer = malloc(sizeof(sev_timer))) == NULL)
         return 0;
 
+    /* resize */
     if (pool->tnum >= pool->tmaxnum) {
         if (sev_timers_resize(pool, 1) != SEV_OK)
             return 0;
@@ -206,23 +244,17 @@ long long sev_add_timer(sev_pool *pool, long long timeout_ms,
     timer->id = ++pool->tmaxid;
     timer->proc = proc;
     timer->data = data;
-    sev_time_add_now(timeout_ms, &timer->sec, &timer->msec); 
+    sev_time_add2now(timeout_ms, &timer->sec, &timer->msec); 
 
     i = pool->tnum;
     pool->timers[pool->tnum++] = timer;
-    while (i > 0) {
-        j = SEV_TIMER_PARENT(i);
-        if (sev_timer_cmp(pool->timers[i], pool->timers[j]) < 0)
-            sev_timer_swap(&pool->timers[i], &pool->timers[j]);
-        i = j;
-    }
+    sev_timer_swap_up(pool, i);
 
     return timer->id;
 }
 
 int sev_del_timer(sev_pool *pool, long long id)
 {
-    /*
     int i;
     sev_timer *timer = NULL;
 
@@ -232,10 +264,32 @@ int sev_del_timer(sev_pool *pool, long long id)
             break;
         } 
     }
-
     if (timer == NULL) return SEV_ERR;
-    */
-        
+
+    if (i != (pool->tnum - 1))
+        sev_timer_swap(&pool->timers[i], &pool->timers[pool->tnum - 1]);
+
+    pool->tnum--;
+    free(pool->timers[pool->tnum]);
+    pool->timers[pool->tnum] = NULL;
+
+    if (pool->timers[i] != NULL) {
+        timer = pool->timers[i];
+        if (i == 0) {
+            sev_timer_swap_down(pool, i);
+        } else {
+            if (sev_timer_cmp(timer, pool->timers[SEV_TIMER_PARENT(i)]) > 0) {
+                sev_timer_swap_down(pool, i);
+            } else {
+                sev_timer_swap_up(pool, i); 
+            }
+        }
+    }
+
+    if (pool->tnum <= (pool->tmaxnum >> 2)) {
+        sev_timers_resize(pool, 0); 
+    }
+
     return SEV_OK;
 }
 

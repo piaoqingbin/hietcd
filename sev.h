@@ -37,8 +37,8 @@
 #define SEV_R 1 /* Readable event flag */
 #define SEV_W 2 /* Writable event flag */
 
-#define SEV_TIMER_DEFAULT_SIZE (1<<2)
-#define SEV_TIMER_MAX_SIZE (1<<25)
+#define SEV_TIMER_DEFAULT_SIZE (1<<7) /* 128, 1k */
+#define SEV_TIMER_MAX_SIZE (1<<17) /* 131072, 1m */  
 
 #define SEV_TIMER_PARENT(i)     (((i)+1)/2-1)
 #define SEV_TIMER_LEFT(i)       ((i)*2+1)
