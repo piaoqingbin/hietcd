@@ -53,7 +53,7 @@
 
 typedef struct etcd_client etcd_client;
 
-/* Response process function */
+/* Response processor */
 typedef void etcd_response_proc(etcd_client *client, etcd_response *resp, void *userdata);
 
 /* Etcd client structure */
@@ -74,7 +74,6 @@ struct etcd_client {
 etcd_client *etcd_client_create(void);
 void etcd_client_destroy(etcd_client *client);
 void etcd_set_response_proc(etcd_client *client, etcd_response_proc *proc, void *userdata);
-
 int etcd_start_io_thread(etcd_client *client);
 void etcd_stop_io_thread(etcd_client *client);
 
@@ -82,14 +81,9 @@ void etcd_stop_io_thread(etcd_client *client);
 int etcd_amkdir(etcd_client *client, const char *key, size_t len, long long ttl);
 
 /*
-etcd_client *etcd_client_create(void);
-void etcd_client_destroy(etcd_client *client);
 int etcd_add_server(etcd_client *client, const char *server, size_t len);
 
 int etcd_mkdir(etcd_client *client, const char *key, size_t len, int ttl, etcd_response *resp);
-
-int etcd_send_request(etcd_client *client, const char *method, const char *key,
-    const char *query, const char *post, etcd_response *resp);
 
 int32_t etcd_mkdir(etcd_client *client, const char *key, uint64_t ttl, etcd_response *resp);
 int32_t etcd_set(etcd_client *client, const char *key, const char *value, uint64_t ttl, etcd_response *resp);
@@ -97,8 +91,6 @@ int32_t etcd_get(etcd_client *client, const char *key, etcd_response *resp);
 int32_t etcd_delete(etcd_client *client, const char *key, etcd_response *resp);
 int32_t etcd_watch(etcd_client *client, const char *key, int32_t nonblock, etcd_response *resp);
 
-int32_t etcd_request_send(etcd_client *client, const char *server, const char *method, 
-    const char *key, const char *query, const char *post, etcd_response *resp);
 */
 
 #endif

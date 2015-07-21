@@ -68,12 +68,12 @@ typedef struct etcd_node {
     unsigned long long ccount; /* number of childs */
 } etcd_node;
 
-/* Etcd http response structure */
+/* Etcd response structure */
 typedef struct {
     CURLcode ccode; /* CURLcode */
     int hcode; /* http status code */
-    int errcode;
-    char errmsg[ETCD_ERR_BUFSIZE];
+    int errcode; /* response error code */
+    char errmsg[ETCD_ERR_BUFSIZE]; /* response error message */
     /* response headers */
     char cluster[32]; /* cluster id */
     long long idx; /* etcd index */
@@ -88,7 +88,6 @@ typedef struct {
 
 etcd_node *etcd_node_create(void);
 void etcd_node_destroy(etcd_node *node);
-
 etcd_response *etcd_response_create(void);
 void etcd_response_cleanup(etcd_response *resp);
 void etcd_response_destroy(etcd_response *resp);

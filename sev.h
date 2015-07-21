@@ -27,6 +27,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #ifndef _SEV_H_
 #define _SEV_H_
 
@@ -37,12 +38,12 @@
 #define SEV_R 1 /* Readable event flag */
 #define SEV_W 2 /* Writable event flag */
 
-#define SEV_TIMER_DEFAULT_SIZE (1<<2) /* 128, 1k */
+#define SEV_TIMER_DEFAULT_SIZE (1<<7) /* 128, 1k */
 #define SEV_TIMER_MAX_SIZE (1<<17) /* 131072, 1m */  
 
-#define SEV_TIMER_PARENT(i)     (((i)+1)/2-1)
-#define SEV_TIMER_LEFT(i)       ((i)*2+1)
-#define SEV_TIMER_RIGHT(i)      (((i)+1)*2)
+#define SEV_TIMER_PARENT(i) (((i)+1)/2-1)
+#define SEV_TIMER_LEFT(i) ((i)*2+1)
+#define SEV_TIMER_RIGHT(i) (((i)+1)*2)
 
 /* Macros */
 #define sev_stop(p) ((p)->done = 1)
@@ -64,6 +65,7 @@ typedef struct {
     void *data;
 } sev_file_event;
 
+/* Ready event */
 typedef struct {
     int fd;
     int flgs;
@@ -87,7 +89,7 @@ typedef struct sev_pool {
     long tmaxnum;
     long long tmaxid; /* max timer id */
     sev_timer **timers;
-    void *impl; /* Polling implementation */
+    void *impl; /* polling implementation */
     sev_file_event *events;
     sev_ready_event *ready;
     sev_cron_proc *cron; 

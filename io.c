@@ -135,7 +135,6 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
     curl_easy_setopt(ch, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
     curl_easy_setopt(ch, CURLOPT_TIMEOUT, io->client->timeout);
     curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, io->client->conntimeout);
-    curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, io->client->conntimeout);
     curl_easy_setopt(ch, CURLOPT_TCP_KEEPALIVE, io->client->keepalive);
 
     curl_easy_setopt(ch, CURLOPT_URL, req->url);
@@ -166,7 +165,6 @@ static int etcd_io_sock_cb(CURL *ch, curl_socket_t fd, int action,
 {
     etcd_io *io = (etcd_io *) cbp; 
     etcd_io_sock *sock = (etcd_io_sock *) sockp;
-    static const char *actstr[]={ "none", "IN", "OUT", "INOUT", "REMOVE"};
     int flgs = (action&CURL_POLL_IN?SEV_R:0)|(action&CURL_POLL_OUT?SEV_W:0);
 
     ETCD_LOG_DEBUG("fd=%d, ch=%p, action=%s", fd, ch, actstr[action]);
@@ -289,13 +287,11 @@ void *etcd_io_start(void *args)
     curl_multi_setopt(io->cmh, CURLMOPT_TIMERFUNCTION, etcd_io_multi_timer_cb);
     curl_multi_setopt(io->cmh, CURLMOPT_TIMERDATA, io);
     
-    // notify
     pthread_mutex_lock(&io->lock);
     io->ready = 1;
     pthread_cond_broadcast(&io->cond);
     pthread_mutex_unlock(&io->lock);
 
-    // dispatch
     ETCD_LOG_INFO("Started IO thread");
     sev_dispatch(io->pool, &io->elt);
     ETCD_LOG_INFO("IO thread terminated");
