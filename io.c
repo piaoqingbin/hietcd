@@ -251,6 +251,7 @@ static void etcd_io_check_info(etcd_io *io)
             ETCD_LOG_DEBUG("remainning running %d", io->running);
             curl_multi_remove_handle(io->cmh, ch);
             curl_easy_cleanup(ch);
+            fprintf(stderr, "ret:%d\n", etcd_response_parse(resp));
             etcd_response_destroy(resp);
         }
     }

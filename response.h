@@ -36,6 +36,8 @@
 #define ETCD_DATA_BUFSIZE (1024*4)
 #define ETCD_ERR_BUFSIZE 256
 
+#define ETCD_OK 0
+#define ETCD_ERR -1
 #define ETCD_ERR_CURL -2 /* CURL error */
 #define ETCD_ERR_PROTOCOL -3 /* Protocol error */
 #define ETCD_ERR_RESPONSE -4 /* Etcd response error */
@@ -54,13 +56,13 @@
 
 /* Etcd node structure */
 typedef struct etcd_node {
-    char *key;
-    char *value;
     int isdir;
     int ttl; /* time to live */
-    char expr[32]; /* expiration */
     long long cidx; /* created Index */
     long long midx; /* modified Index */
+    char expr[32]; /* expiration */
+    char *key;
+    char *value;
     struct etcd_node *snode; /* sibling node */
     struct etcd_node *cnode; /* child node */
     unsigned long long ccount; /* number of childs */
@@ -90,8 +92,7 @@ void etcd_node_destroy(etcd_node *node);
 etcd_response *etcd_response_create(void);
 void etcd_response_cleanup(etcd_response *resp);
 void etcd_response_destroy(etcd_response *resp);
-
-size_t etcd_response_write_cb(char *ptr, size_t size, size_t nmemb, 
-    void *userdata);
+size_t etcd_response_write_cb(char *ptr, size_t size, size_t nmemb, void *userdata);
+int etcd_response_parse(etcd_response *resp);
 
 #endif
