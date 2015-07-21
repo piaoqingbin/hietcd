@@ -75,7 +75,7 @@ typedef struct {
     int errcode;
     char errmsg[ETCD_ERR_BUFSIZE];
     /* response headers */
-    char cluster[16]; /* cluster id */
+    char cluster[32]; /* cluster id */
     long long idx; /* etcd index */
     long long ridx; /* raft index */
     long long rterm; /* raft term */
@@ -92,6 +92,7 @@ void etcd_node_destroy(etcd_node *node);
 etcd_response *etcd_response_create(void);
 void etcd_response_cleanup(etcd_response *resp);
 void etcd_response_destroy(etcd_response *resp);
+size_t etcd_response_header_cb(char *buffer, size_t size, size_t nitems, void *userdata);
 size_t etcd_response_write_cb(char *ptr, size_t size, size_t nmemb, void *userdata);
 int etcd_response_parse(etcd_response *resp);
 

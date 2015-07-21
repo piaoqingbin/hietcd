@@ -168,6 +168,33 @@ void etcd_response_destroy(etcd_response *resp)
     free(resp);
 }
 
+size_t etcd_response_header_cb(char *buffer, size_t size, size_t nitems, 
+    void *userdata)
+{
+    size_t n = 0;
+    char *p = buffer;
+    etcd_response *resp = userdata;
+
+    if (!resp) goto response_header_cb_done;
+
+    if (strstr(p, ETCD_HEADER_ECID) == p) {
+//        n = sizeof(ETCD_HEADER_ECID);
+//        resp->cluster_id = strndup(p + n + 1, nitems - n - 2);
+    } else if (strstr(p, ETCD_HEADER_EIDX) == p) {
+//        n = sizeof(ETCD_HEADER_EIDX);
+//        resp->etcd_index = atoi(p + n + 1);
+    } else if (strstr(p, ETCD_HEADER_RIDX) == p) {
+//        n = sizeof(ETCD_HEADER_RIDX);
+//        resp->raft_index = atoi(p + n + 1);
+    } else if (strstr(p, ETCD_HEADER_RTERM) == p) {
+//        n = sizeof(ETCD_HEADER_RTERM);
+//        resp->raft_term = atoi(p + n + 1);
+    }
+
+response_header_cb_done:
+    return nitems * size;
+}
+
 size_t etcd_response_write_cb(char *ptr, size_t size, size_t nmemb, 
     void *userdata)
 {

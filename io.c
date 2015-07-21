@@ -136,6 +136,8 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
 
     curl_easy_setopt(ch, CURLOPT_URL, req->url);
     curl_easy_setopt(ch, CURLOPT_CUSTOMREQUEST, req->method);
+    curl_easy_setopt(ch, CURLOPT_HEADERDATA, resp);
+    curl_easy_setopt(ch, CURLOPT_HEADERFUNCTION, etcd_response_header_cb);
     curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, etcd_response_write_cb);
     curl_easy_setopt(ch, CURLOPT_WRITEDATA, resp->data);
     curl_easy_setopt(ch, CURLOPT_ERRORBUFFER, resp->errmsg);
