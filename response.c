@@ -88,7 +88,7 @@ static yajl_type etcd_resp_key_type[] = {
 static inline void etcd_response_init(etcd_response *resp);
 static int etcd_response_parse_err(etcd_response *resp, yajl_val obj);
 static etcd_node *etcd_response_parse_node(yajl_val obj, int parse_child);
-static int etcd_response_parse_key(yajl_val obj, int i, void *data);
+static int etcd_response_parse_key(yajl_val obj, etcd_resp_key, void *data);
 
 etcd_node *etcd_node_create(void)
 {
@@ -250,10 +250,10 @@ static etcd_node *etcd_response_parse_node(yajl_val obj, int parse_child)
     return node;
 }
 
-static int etcd_response_parse_key(yajl_val obj, int i, void *data)
+static int etcd_response_parse_key(yajl_val obj, etcd_resp_key k, void *data)
 {
     yajl_val val;
-    yajl_type t = etcd_resp_key_type[i];
+    yajl_type t = etcd_resp_key_type[k];
     int llnum = 1;
 
     if (t == yajl_t_any) {
@@ -261,7 +261,7 @@ static int etcd_response_parse_key(yajl_val obj, int i, void *data)
         llnum = 0;
     }
 
-    val = yajl_tree_get(obj, etcd_resp_key_path[i], t);
+    val = yajl_tree_get(obj, etcd_resp_key_path[k], t);
     if (!val) return ETCD_ERR_PROTOCOL;
 
     switch (t) {
