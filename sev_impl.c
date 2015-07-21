@@ -187,11 +187,12 @@ static void sev_impl_del(sev_pool *pool, int fd, int flgs)
 
 static int sev_impl_poll(sev_pool *pool, struct timeval *tvp)
 {
-    struct timeval tv, *tp = NULL;
+    struct timeval *tp = NULL;
     sev_impl *impl = pool->impl;
     int fd, num = 0; /* number of events */
 
     if (tvp != NULL) {
+        struct timeval tv;
         tv.tv_sec = tvp->tv_sec;
         tv.tv_usec = tvp->tv_usec;
         tp = &tv;
