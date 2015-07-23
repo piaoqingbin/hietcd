@@ -55,11 +55,9 @@ void proc(etcd_client *client, etcd_response *resp, void *data)
 int main(void) {
 
     etcd_client *client = etcd_client_create(); 
-//    etcd_set_log_level(ETCD_LOG_LEVEL_DEBUG);
+    etcd_set_log_level(ETCD_LOG_LEVEL_DEBUG);
     client->servers[0] = "http://10.69.56.43:2379";
     etcd_set_response_proc(client, proc, "test_data_haha");
-
-    etcd_start_io_thread(client);
 
     //etcd_amkdir(client, "/test/key1", 0);
     //etcd_amkdir(client, "/test/key2", 1000);
@@ -81,12 +79,5 @@ int main(void) {
 
     etcd_client_destroy(client);
 
-
-    /*
-    while (1) {
-        fprintf(stderr, "main running...\n"); 
-        sleep(1);
-    }
-    */
 
 }

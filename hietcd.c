@@ -64,6 +64,8 @@ etcd_client *etcd_client_create(void)
     client->proc = NULL;
     client->userdata = NULL;
 
+    etcd_start_io_thread(client);
+
     return client;
 }
 
@@ -135,8 +137,7 @@ void etcd_stop_io_thread(etcd_client *client)
 
 static inline int etcd_notify_io_thread(etcd_client *client)
 {
-    char c = 0;
-    return write(client->wfd, &c, 1) == 1 ? HIETCD_OK : HIETCD_ERR;
+    return write(client->wfd, &"\0", 1) == 1 ? HIETCD_OK : HIETCD_ERR;
 }
 
 static int etcd_set_nonblock(int fd)
