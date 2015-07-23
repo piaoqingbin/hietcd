@@ -29,6 +29,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -43,9 +44,9 @@
 #include "request.h"
 
 static int etcd_set_nonblock(int fd);
-static int etcd_fmt_url(etcd_client *client, const char *key, char *url);
-static int etcd_notify_io_thread(etcd_client *client);
-static int etcd_send_queue(etcd_client *client, etcd_request *req);
+static inline int etcd_fmt_url(etcd_client *client, const char *key, char *url);
+static inline int etcd_notify_io_thread(etcd_client *client);
+static inline int etcd_send_queue(etcd_client *client, etcd_request *req);
 
 etcd_client *etcd_client_create(void)
 {
@@ -132,7 +133,7 @@ void etcd_stop_io_thread(etcd_client *client)
     }
 }
 
-static int etcd_notify_io_thread(etcd_client *client)
+static inline int etcd_notify_io_thread(etcd_client *client)
 {
     char c = 0;
     return write(client->wfd, &c, 1) == 1 ? HIETCD_OK : HIETCD_ERR;
@@ -145,34 +146,70 @@ static int etcd_set_nonblock(int fd)
     return fcntl(fd, F_SETFL, l | O_NONBLOCK);
 }
 
-static int etcd_fmt_url(etcd_client *client, const char *key, char *url) 
+static inline int etcd_fmt_url(etcd_client *client, const char *key, char *url) 
 {
     return snprintf(url, HIETCD_URL_BUFSIZE, "%s/%s/keys%s", 
             client->servers[0], HIETCD_SERVER_VERSION, key);
 }
 
 
-static int etcd_send_queue(etcd_client *client, etcd_request *req)
+static inline int etcd_send_queue(etcd_client *client, etcd_request *req)
 {
     etcd_io_push_request(client->io, req);
     return etcd_notify_io_thread(client);
 }
 
-int etcd_amkdir(etcd_client *client, const char *key, size_t len, 
-        long long ttl)
+int etcd_amkdir(etcd_client *client, const char *key, int ttl)
 {
-    int n;
     etcd_request *req;
     char url[HIETCD_URL_BUFSIZE] = {0}; 
-
+    const char data[] = "dir=true";
+    int n = 0;
+    
     n = etcd_fmt_url(client, key, url);
     if (ttl > 0) 
-        n += snprintf(url + n, HIETCD_URL_BUFSIZE - n, "?ttl=%llu", ttl);
+        n += snprintf(url + n, HIETCD_URL_BUFSIZE - n, "?ttl=%d", ttl);
 
     if ((req = etcd_request_create(url, n, ETCD_REQUEST_PUT)) == NULL)
         return HIETCD_ERR;
 
-    etcd_request_set_data(req, "dir=true", 8);
+    etcd_request_dup_data(req, data, sizeof(data));
+    return etcd_send_queue(client, req);
+}
+
+int etcd_aset(etcd_client *client, const char *key, const char *value, 
+    size_t len, int ttl)
+{
+    etcd_request *req;
+    char url[HIETCD_URL_BUFSIZE] = {0}, *data = NULL; 
+    size_t datasize = len + 22; /* value=%s;ttl=%d */
+    int n = 0;
+    
+    n = etcd_fmt_url(client, key, url);
+    if ((req = etcd_request_create(url, n, ETCD_REQUEST_PUT)) == NULL)
+        return HIETCD_ERR;
+
+    if ((data = malloc(datasize)) == NULL) return HIETCD_ERR;
+    n = snprintf(data, datasize, "value=%s", value);
+    if (ttl > 0) snprintf(data + n, datasize - n, ";ttl=%d", ttl);
+    etcd_request_set_data(req, data);
+
+    return etcd_send_queue(client, req);
+
+}
+
+int etcd_aget(etcd_client *client, const char *key)
+{
+    etcd_request *req;
+    char url[HIETCD_URL_BUFSIZE] = {0}; 
+    int n = 0;
+    
+    n = etcd_fmt_url(client, key, url);
+    n += snprintf(url + n, HIETCD_URL_BUFSIZE - n, "?recursive=true");
+
+    if ((req = etcd_request_create(url, n, ETCD_REQUEST_GET)) == NULL)
+        return HIETCD_ERR;
+
     return etcd_send_queue(client, req);
 }
 

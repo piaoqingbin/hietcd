@@ -64,7 +64,7 @@ struct etcd_request_queue {
 #define etcd_rq_last(h)     ((h)->prev)
 #define etcd_rq_prev(q)     ((q)->prev)
 #define etcd_rq_next(q)     ((q)->next)
-#define etcd_rq_getreq(q)   ((etcd_request *)((size_t)q-(3*sizeof(void *))))
+#define etcd_rq_getreq(q)   ((etcd_request *)((size_t)(q)-(3*sizeof(void *))))
 
 /* Etcd request structure */
 typedef struct {
@@ -74,7 +74,8 @@ typedef struct {
     etcd_rq rq; 
 } etcd_request;
 
-#define etcd_request_set_data(r,d,l)    ((r)->data = strndup((d),(l)))
+#define etcd_request_set_data(r,d)      ((r)->data = (d))
+#define etcd_request_dup_data(r,d,l)    ((r)->data = strndup((d),(l)))
 
 etcd_request *etcd_request_create(char *url, size_t len, const char *method);
 void etcd_request_destroy(etcd_request *req);

@@ -78,16 +78,13 @@ int etcd_start_io_thread(etcd_client *client);
 void etcd_stop_io_thread(etcd_client *client);
 
 /* Async api */
-int etcd_amkdir(etcd_client *client, const char *key, size_t len, long long ttl);
+int etcd_amkdir(etcd_client *client, const char *key, int ttl);
+int etcd_aset(etcd_client *client, const char *key, const char *value, size_t len, int ttl);
+int etcd_aget(etcd_client *client, const char *key);
 
 /*
 int etcd_add_server(etcd_client *client, const char *server, size_t len);
 
-int etcd_mkdir(etcd_client *client, const char *key, size_t len, int ttl, etcd_response *resp);
-
-int32_t etcd_mkdir(etcd_client *client, const char *key, uint64_t ttl, etcd_response *resp);
-int32_t etcd_set(etcd_client *client, const char *key, const char *value, uint64_t ttl, etcd_response *resp);
-int32_t etcd_get(etcd_client *client, const char *key, etcd_response *resp);
 int32_t etcd_delete(etcd_client *client, const char *key, etcd_response *resp);
 int32_t etcd_watch(etcd_client *client, const char *key, int32_t nonblock, etcd_response *resp);
 

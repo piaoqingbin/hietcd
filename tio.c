@@ -56,7 +56,7 @@ int main(void) {
 
     etcd_client *client = etcd_client_create(); 
 //    etcd_set_log_level(ETCD_LOG_LEVEL_DEBUG);
-    client->servers[0] = "http://10.79.80.240:2379";
+    client->servers[0] = "http://10.69.56.43:2379";
     etcd_set_response_proc(client, proc, "test_data_haha");
 
     etcd_start_io_thread(client);
@@ -64,14 +64,19 @@ int main(void) {
     sleep(1);
 
     int i;
-    for (i = 1; i < 10; i++) {
-        etcd_amkdir(client, "/test/key1", 10, i*10);
-        etcd_amkdir(client, "/test/key2", 10, i*10);
-        etcd_amkdir(client, "/test/key3", 10, i*10);
-        etcd_amkdir(client, "/test/key4", 10, i*10);
+    for (i = 1; i < 2; i++) {
+        etcd_amkdir(client, "/test/key1", i*100);
+        etcd_amkdir(client, "/test/key2", i*100);
     }
 
-    sleep(1000);
+//    sleep(3);
+
+    const char *v1 = "hahah_v1";
+    etcd_aset(client, "/test/key1/tn1", v1, sizeof(v1), 100);
+
+
+    sleep(10);
+
     etcd_client_destroy(client);
 
 
