@@ -48,8 +48,8 @@ void etcd_response_print(etcd_response *resp)
 
 void proc(etcd_client *client, etcd_response *resp, void *data)
 {
-//    etcd_response_print(resp);
-    printf("done!\n");
+    etcd_response_print(resp);
+    //printf("done!\n");
 }
 
 int main(void) {
@@ -61,21 +61,23 @@ int main(void) {
 
     etcd_start_io_thread(client);
 
-    sleep(1);
-
-    int i;
-    for (i = 1; i < 2; i++) {
-        etcd_amkdir(client, "/test/key1", i*100);
-        etcd_amkdir(client, "/test/key2", i*100);
-    }
-
-//    sleep(3);
+    //etcd_amkdir(client, "/test/key1", 0);
+    //etcd_amkdir(client, "/test/key2", 1000);
 
     const char *v1 = "hahah_v1";
-    etcd_aset(client, "/test/key1/tn1", v1, sizeof(v1), 100);
+    //etcd_aset(client, "/test/key1/tn1", v1, sizeof(v1), 100);
+    //etcd_aset(client, "/test/key1/tn2", v1, sizeof(v1), 0);
 
+    sleep(1);
 
-    sleep(10);
+    //etcd_aget(client, "/test/key1/tn1");
+    //etcd_aget(client, "/test");
+    //
+    //etcd_adelete(client, "/test/key1/tn1");
+
+    etcd_awatch(client, "/test");
+
+    sleep(60);
 
     etcd_client_destroy(client);
 

@@ -81,13 +81,7 @@ void etcd_stop_io_thread(etcd_client *client);
 int etcd_amkdir(etcd_client *client, const char *key, int ttl);
 int etcd_aset(etcd_client *client, const char *key, const char *value, size_t len, int ttl);
 int etcd_aget(etcd_client *client, const char *key);
-
-/*
-int etcd_add_server(etcd_client *client, const char *server, size_t len);
-
-int32_t etcd_delete(etcd_client *client, const char *key, etcd_response *resp);
-int32_t etcd_watch(etcd_client *client, const char *key, int32_t nonblock, etcd_response *resp);
-
-*/
+int etcd_adelete(etcd_client *client, const char *key);
+int etcd_awatch(etcd_client *client, const char *key);
 
 #endif

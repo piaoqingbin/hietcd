@@ -209,31 +209,33 @@ int etcd_aget(etcd_client *client, const char *key)
 
     if ((req = etcd_request_create(url, n, ETCD_REQUEST_GET)) == NULL)
         return HIETCD_ERR;
-
     return etcd_send_queue(client, req);
 }
 
-/*
-int etcd_add_server(etcd_client *client, const char *server, size_t len)
+int etcd_adelete(etcd_client *client, const char *key)
 {
-    if (client->snum >= HIETCD_MAX_NODE_NUM)
+    etcd_request *req;
+    char url[HIETCD_URL_BUFSIZE] = {0}; 
+    int n = 0;
+
+    n = etcd_fmt_url(client, key, url);
+    n += snprintf(url + n, HIETCD_URL_BUFSIZE - n, "?recursive=true");
+
+    if ((req = etcd_request_create(url, n, ETCD_REQUEST_DELETE)) == NULL)
         return HIETCD_ERR;
-
-    client->servers[client->snum++] = strndup(server, len); 
-    return HIETCD_OK;
+    return etcd_send_queue(client, req);
 }
 
-int etcd_mkdir(etcd_client *client, const char *key, size_t len, int ttl, 
-    etcd_response *resp)
+int etcd_awatch(etcd_client *client, const char *key)
 {
+    etcd_request *req;
+    char url[HIETCD_URL_BUFSIZE] = {0}; 
+    int n = 0;
     
-}
+    n = etcd_fmt_url(client, key, url);
+    n += snprintf(url + n, HIETCD_URL_BUFSIZE - n, "?wait=true&recursive=true");
 
-int etcd_send_request(etcd_client *client, const char *method, const char *key,
-    const char *query, const char *post, etcd_response *resp)
-{
-    CURL *ch;
-
-    ch = curl_easy_init();
+    if ((req = etcd_request_create(url, n, ETCD_REQUEST_GET)) == NULL)
+        return HIETCD_ERR;
+    return etcd_send_queue(client, req);
 }
-*/

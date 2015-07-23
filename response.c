@@ -86,7 +86,6 @@ static yajl_type etcd_resp_key_type[] = {
     yajl_t_number,
     yajl_t_number,
     yajl_t_string,
-    yajl_t_object,
     yajl_t_array
 };
 
@@ -271,7 +270,7 @@ static etcd_node *etcd_response_parse_node(yajl_val obj, int parse_child)
 
             cnode = pcnode = NULL;
             for (i = 0; i < node->ccount; i++) {
-                cnode = etcd_response_parse_node(val->u.array.values[i], 1);
+                cnode = etcd_response_parse_node(val->u.array.values[i], 0);
                 if (!cnode) continue;
                 if (i == 0) node->cnode = cnode;
                 if (pcnode) pcnode->snode = cnode;
