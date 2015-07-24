@@ -40,7 +40,7 @@
 #define HIETCD_ERR -1
 
 /* Client/Server version */
-#define HIETCD_VERSION "0.02"
+#define HIETCD_VERSION 0.0.2
 #define HIETCD_SERVER_VERSION "v2"
 
 #define HIETCD_MAX_NODE_NUM 11
