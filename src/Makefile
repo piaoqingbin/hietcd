@@ -43,7 +43,7 @@ response.o: response.c hietcd.h io.h sev.h request.h response.h
 sev.o: sev.c sev.h sev_impl.c
 
 .c.o:
-	$(CC) $(STD) $(OPT) $(WARN) $(DEBUG)$(HIETCD_DEF) -fPIC -c$(CFLAGS) $<
+	$(CC) $(STD) $(OPT) $(WARN) $(DEBUG) $(HIETCD_DEF) -fPIC -c $<
 
 clean:
 	rm -rf $(DLIBNAME) $(SLIBNAME) $(OBJECTS)
