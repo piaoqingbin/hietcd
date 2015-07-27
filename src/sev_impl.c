@@ -106,7 +106,7 @@ static void sev_impl_del(sev_pool *pool, int fd, int flgs)
     ee.data.u64 = 0;
     ee.data.fd = fd;
 
-    if (pool->events[fd].flgs & (~flgs) == SEV_N)
+    if ((pool->events[fd].flgs & (~flgs)) == SEV_N)
         op = EPOLL_CTL_DEL;
     else
         op = EPOLL_CTL_MOD;

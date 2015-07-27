@@ -1,9 +1,9 @@
 
 CC:=$(shell sh -c 'type $(CC) >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
-STD= -std=c99 -pedantic
-WARN= -Wall -W
-OPT= -O2
-DEBUG= -g
+STD=-std=gnu99 -pedantic
+WARN=-Wall -W
+OPT=-O2
+DEBUG=-g
 
 PROJECT=hietcd
 PREFIX?=/usr/local
@@ -40,10 +40,10 @@ io.o: io.c sev.h log.h io.h request.h hietcd.h response.h
 log.o: log.c log.h
 request.o: request.c request.h
 response.o: response.c hietcd.h io.h sev.h request.h response.h
-sev.o: $(HIETCD_DEF) sev.c sev.h sev_impl.c
+sev.o: sev.c sev.h sev_impl.c
 
 .c.o:
-	$(CC) $(STD) $(OPT) $(WARN) $(DEBUG) -c -fPIC $(CFLAGS) $<
+	$(CC) $(STD) $(OPT) $(WARN) $(DEBUG)$(HIETCD_DEF) -fPIC -c$(CFLAGS) $<
 
 clean:
 	rm -rf $(DLIBNAME) $(SLIBNAME) $(OBJECTS)

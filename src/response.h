@@ -71,8 +71,8 @@ typedef struct etcd_node {
 /* Etcd response structure */
 typedef struct {
     CURLcode ccode; /* CURLcode */
-    int hcode; /* http status code */
-    int errcode; /* response error code */
+    long hcode; /* http status code */
+    long errcode; /* response error code */
     char errmsg[ETCD_ERR_BUFSIZE]; /* response error message */
     /* response headers */
     char cluster[32]; /* cluster id */

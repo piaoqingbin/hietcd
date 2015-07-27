@@ -39,6 +39,8 @@
 #define HIETCD_OK 0
 #define HIETCD_ERR -1
 
+#define HIETCD_UNUSED(x) (void)(x)
+
 /* Client/Server version */
 #define HIETCD_VERSION 0.0.2
 #define HIETCD_SERVER_VERSION "v2"

@@ -33,11 +33,14 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <curl/curl.h>
+
 #include "sev.h"
 #include "log.h"
 #include "io.h"
 #include "request.h"
 #include "response.h"
+#include "hietcd.h"
 
 static const char *actstr[] = {"none", "IN", "OUT", "INOUT", "REMOVE"};
 
@@ -93,6 +96,8 @@ void etcd_io_destroy(etcd_io *io)
 static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs)
 {
     char buf[1];
+    HIETCD_UNUSED(pool);
+    HIETCD_UNUSED(flgs);
     if (read(fd, buf, sizeof(buf)) == 1) {
         etcd_io *io = (etcd_io *) data;
         etcd_request *req;
@@ -108,6 +113,7 @@ static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs)
 
 static void etcd_io_cron(sev_pool *pool) 
 {
+    HIETCD_UNUSED(pool);
     //ETCD_LOG_DEBUG("running ...");
 }
 
@@ -135,7 +141,9 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
     curl_easy_setopt(ch, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
     curl_easy_setopt(ch, CURLOPT_TIMEOUT, io->client->timeout);
     curl_easy_setopt(ch, CURLOPT_CONNECTTIMEOUT, io->client->conntimeout);
+#ifdef CURLOPT_TCP_KEEPALIVE
     curl_easy_setopt(ch, CURLOPT_TCP_KEEPALIVE, io->client->keepalive);
+#endif
     curl_easy_setopt(ch, CURLOPT_NOPROGRESS, 1L);
 
     curl_easy_setopt(ch, CURLOPT_URL, req->url);
@@ -143,7 +151,7 @@ static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
     curl_easy_setopt(ch, CURLOPT_HEADERDATA, resp);
     curl_easy_setopt(ch, CURLOPT_HEADERFUNCTION, etcd_response_header_cb);
     curl_easy_setopt(ch, CURLOPT_WRITEFUNCTION, etcd_response_write_cb);
-    curl_easy_setopt(ch, CURLOPT_WRITEDATA, resp->data);
+    curl_easy_setopt(ch, CURLOPT_WRITEDATA, (void *)resp->data);
     curl_easy_setopt(ch, CURLOPT_ERRORBUFFER, resp->errmsg);
     curl_easy_setopt(ch, CURLOPT_PRIVATE, resp);
 
@@ -197,6 +205,7 @@ static int etcd_io_sock_cb(CURL *ch, curl_socket_t fd, int action,
 
 static int etcd_io_multi_timer_cb(CURLM *cmh, long timeout_ms, etcd_io *io)
 {
+    HIETCD_UNUSED(cmh);
     ETCD_LOG_DEBUG("multi_timer_cb: Setting timeout to %ld ms\n", timeout_ms);
     sev_del_timer(io->pool, io->tid);
     if (timeout_ms > 0) {
@@ -212,6 +221,7 @@ static void etcd_io_timer_cb(struct sev_pool *pool, long long id, void *data)
 {
     CURLMcode code;
     etcd_io *io = (etcd_io *) data; 
+    HIETCD_UNUSED(pool);
 
     sev_del_timer(pool, id);
     code = curl_multi_socket_action(io->cmh, CURL_SOCKET_TIMEOUT, 0, &io->running);
@@ -225,6 +235,7 @@ static void etcd_io_timer_cb(struct sev_pool *pool, long long id, void *data)
 static void etcd_io_event_cb(sev_pool *pool, int fd, void *data, int flgs)
 {
     CURLMcode code;
+    HIETCD_UNUSED(pool);
     etcd_io *io = (etcd_io *) data;
     int action = (flgs&SEV_R?CURL_POLL_IN:0)|(flgs&SEV_W?CURL_POLL_OUT:0);
     
@@ -254,15 +265,15 @@ static void etcd_io_check_info(etcd_io *io)
     char *eff_url;
     CURLMsg *msg;
     int msgs_left;
-    etcd_response *resp;
     CURL *ch;
     CURLcode code;
+    etcd_response *resp = NULL;
     
     while ((msg = curl_multi_info_read(io->cmh, &msgs_left))) {
         if (msg->msg == CURLMSG_DONE) {
             ch = msg->easy_handle;
             code = msg->data.result;
-            curl_easy_getinfo(ch, CURLINFO_PRIVATE, &resp);
+            curl_easy_getinfo(ch, CURLINFO_PRIVATE, (void *)resp);
             curl_easy_getinfo(ch, CURLINFO_EFFECTIVE_URL, &eff_url);
             ETCD_LOG_INFO("done, %s => (%d) %s", eff_url, code, resp->errmsg); 
             ETCD_LOG_DEBUG("remainning running %d", io->running);

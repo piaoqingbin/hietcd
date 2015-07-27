@@ -302,10 +302,12 @@ static int etcd_response_parse_key(yajl_val obj, etcd_resp_key k, void *data, in
 
     case yajl_t_string:
         if (YAJL_IS_STRING(val)) {
+            const char *str = YAJL_GET_STRING(val);
             if (flgs & PF_STRCPY) {
-                strcpy((char *)data, YAJL_GET_STRING(val));
+                char *str = YAJL_GET_STRING(val);
+                strcpy(*((char **)data), str);
             } else {
-                *((char **)data) = strdup(YAJL_GET_STRING(val));
+                *((char **)data) = strdup(str);
             }
         }
         break;
