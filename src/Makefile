@@ -1,3 +1,4 @@
+
 CC:=$(shell sh -c 'type $(CC) >/dev/null 2>/dev/null && echo $(CC) || echo gcc')
 STD= -std=c99 -pedantic
 WARN= -Wall -W
