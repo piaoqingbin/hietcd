@@ -210,7 +210,6 @@ size_t etcd_response_write_cb(char *ptr, size_t size, size_t nmemb,
 int etcd_response_parse(etcd_response *resp)
 {
     yajl_val obj, val;
-    etcd_node *node;
 
     obj = yajl_tree_parse(resp->data, resp->errmsg, sizeof(resp->errmsg));
     if (!obj || !YAJL_IS_OBJECT(obj)) {

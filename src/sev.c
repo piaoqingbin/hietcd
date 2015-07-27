@@ -225,7 +225,7 @@ long long sev_add_timer(sev_pool *pool, long long timeout_ms,
         sev_timer_proc *proc, void *data)
 {
     sev_timer *timer;
-    int i, j;
+    int i;
 
     if ((timer = malloc(sizeof(sev_timer))) == NULL)
         return 0;

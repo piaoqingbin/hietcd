@@ -213,6 +213,7 @@ static void etcd_io_timer_cb(struct sev_pool *pool, long long id, void *data)
     CURLMcode code;
     etcd_io *io = (etcd_io *) data; 
 
+    sev_del_timer(pool, id);
     code = curl_multi_socket_action(io->cmh, CURL_SOCKET_TIMEOUT, 0, &io->running);
     if (code != CURLM_OK) {
         ETCD_LOG_ERROR("curl_multi_socket_action: %d", code);

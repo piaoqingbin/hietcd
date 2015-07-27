@@ -63,9 +63,9 @@ typedef struct etcd_node {
     char expr[32]; /* expiration */
     char *key;
     char *value;
+    long long ccount; /* number of childs */
     struct etcd_node *snode; /* sibling node */
     struct etcd_node *cnode; /* child node */
-    unsigned long long ccount; /* number of childs */
 } etcd_node;
 
 /* Etcd response structure */
