@@ -2,11 +2,10 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "hietcd.h"
-#include "log.h"
-#include "response.h"
+#include "hietcd/hietcd.h"
+#include "hietcd/log.h"
 
-static inline void etcd_node_print(etcd_node *node, const char *node_name, uint32_t depth)
+static inline void etcd_node_print(etcd_node *node, const char *node_name, int depth)
 {
     if (node == NULL) return;
     printf("\n");
