@@ -42,7 +42,10 @@
 #define HIETCD_UNUSED(x) (void)(x)
 
 /* Client/Server version */
-#define HIETCD_VERSION 0.0.2
+#define HIETCD_VERSION 0.1.2
+#define HIETCD_MAJOR_VERSION 0
+#define HIETCD_MINOR_VERSION 1
+#define HIETCD_PATCH_VERSION 2
 #define HIETCD_SERVER_VERSION "v2"
 
 #define HIETCD_MAX_NODE_NUM 11

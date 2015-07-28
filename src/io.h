@@ -51,7 +51,7 @@ struct etcd_io {
     struct timeval elt; /* Event loop timeout */
     sev_pool *pool; /* Event pool */
     struct etcd_client *client; /* Global config */
-    CURLM *cmh; /* CURL mutil handler */
+    CURLM *cmh; /* CURL multi handler */
     /* Request queue */
     etcd_rq rq;
     pthread_mutex_t rqlock;

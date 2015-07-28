@@ -222,7 +222,6 @@ int etcd_response_parse(etcd_response *resp)
     
     etcd_response_parse_key(obj, ETCD_RESP_KEY_ACTION, &resp->action, PF_STRCPY);
 
-    // node
     if (etcd_response_parse_key(obj, ETCD_RESP_KEY_NODE, &val, PF_NULL) == ETCD_OK)
         resp->node = etcd_response_parse_node(val, 1); 
     if (etcd_response_parse_key(obj, ETCD_RESP_KEY_PNODE, &val, PF_NULL) == ETCD_OK)
@@ -304,7 +303,6 @@ static int etcd_response_parse_key(yajl_val obj, etcd_resp_key k, void *data, in
         if (YAJL_IS_STRING(val)) {
             const char *str = YAJL_GET_STRING(val);
             if (flgs & PF_STRCPY) {
-                char *str = YAJL_GET_STRING(val);
                 strcpy(*((char **)data), str);
             } else {
                 *((char **)data) = strdup(str);

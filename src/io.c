@@ -96,8 +96,10 @@ void etcd_io_destroy(etcd_io *io)
 static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs)
 {
     char buf[1];
+
     HIETCD_UNUSED(pool);
     HIETCD_UNUSED(flgs);
+
     if (read(fd, buf, sizeof(buf)) == 1) {
         etcd_io *io = (etcd_io *) data;
         etcd_request *req;
@@ -114,7 +116,6 @@ static void etcd_io_read(sev_pool *pool, int fd, void *data, int flgs)
 static void etcd_io_cron(sev_pool *pool) 
 {
     HIETCD_UNUSED(pool);
-    //ETCD_LOG_DEBUG("running ...");
 }
 
 static void etcd_io_dispatch(etcd_io *io, etcd_request *req)
@@ -206,6 +207,7 @@ static int etcd_io_sock_cb(CURL *ch, curl_socket_t fd, int action,
 static int etcd_io_multi_timer_cb(CURLM *cmh, long timeout_ms, etcd_io *io)
 {
     HIETCD_UNUSED(cmh);
+
     ETCD_LOG_DEBUG("multi_timer_cb: Setting timeout to %ld ms\n", timeout_ms);
     sev_del_timer(io->pool, io->tid);
     if (timeout_ms > 0) {
@@ -221,6 +223,7 @@ static void etcd_io_timer_cb(struct sev_pool *pool, long long id, void *data)
 {
     CURLMcode code;
     etcd_io *io = (etcd_io *) data; 
+
     HIETCD_UNUSED(pool);
 
     sev_del_timer(pool, id);
@@ -235,9 +238,10 @@ static void etcd_io_timer_cb(struct sev_pool *pool, long long id, void *data)
 static void etcd_io_event_cb(sev_pool *pool, int fd, void *data, int flgs)
 {
     CURLMcode code;
-    HIETCD_UNUSED(pool);
     etcd_io *io = (etcd_io *) data;
     int action = (flgs&SEV_R?CURL_POLL_IN:0)|(flgs&SEV_W?CURL_POLL_OUT:0);
+
+    HIETCD_UNUSED(pool);
     
     code = curl_multi_socket_action(io->cmh, fd, action, &io->running);
     if (code != CURLM_OK) {
